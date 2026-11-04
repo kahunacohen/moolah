@@ -1,0 +1,21 @@
+version: 2
+
+builds:
+  - main: ./cmd/moolah
+    env:
+      - CGO_ENABLED=0
+    goos: [linux]
+    goarch: [amd64, arm64]
+    flags: [-trimpath]
+    ldflags:
+      - -s -w -X moolah/app.Version={{.Version}}
+
+archives:
+  - formats: [tar.gz]
+    files: [README.md, LICENSE]
+
+checksum:
+  name_template: checksums.txt
+
+changelog:
+  use: git
