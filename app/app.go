@@ -20,10 +20,11 @@ var Version = "dev"
 
 // App is one open book.
 type App struct {
-	Book  string // book name, or "" when opened with an explicit path
-	Paths Paths
-	now   func() time.Time
-	st    *store.Store
+	Book       string                 // book name, or "" when opened with an explicit path
+	Passphrase func() (string, error) // asked when a private key has a passphrase
+	Paths      Paths
+	now        func() time.Time
+	st         *store.Store
 }
 
 // Open opens an existing book file.

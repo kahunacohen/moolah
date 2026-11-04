@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"strings"
 )
 
 // migrations[i] upgrades the schema from version i to i+1. Never edit a released
@@ -86,10 +87,37 @@ CREATE TABLE prices (
 	PRIMARY KEY (base, quote, date, source)
 );
 `,
+	// v2: change counter for sync.
+	changeCounter("accounts", "transactions", "postings", "transaction_meta", "tags", "transaction_tags", "prices", "settings"),
+}
+
+// changeCounter adds triggers that increase meta.change_seq on every write to the
+// given tables. Sync uses it to know whether the book has changes not uploaded yet.
+// The meta table itself has no trigger, so sync bookkeeping does not count as a change.
+func changeCounter(tables ...string) string {
+	var b strings.Builder
+	b.WriteString("INSERT INTO meta (key, value) VALUES ('change_seq', '0') ON CONFLICT(key) DO NOTHING;\n")
+	for _, t := range tables {
+		for _, op := range []string{"INSERT", "UPDATE", "DELETE"} {
+			fmt.Fprintf(&b, "CREATE TRIGGER %s_%s_seq AFTER %s ON %s BEGIN "+
+				"UPDATE meta SET value = CAST(value AS INTEGER) + 1 WHERE key = 'change_seq'; END;\n",
+				t, strings.ToLower(op), op, t)
+		}
+	}
+	return b.String()
 }
 
 // SchemaVersion is the schema version this binary writes.
 var SchemaVersion = len(migrations)
+
+// ChangeSeq returns the number of writes to user data so far.
+func (q Q) ChangeSeq(ctx context.Context) (int64, error) {
+	v, ok, err := q.Meta(ctx, "change_seq")
+	if err != nil || !ok {
+		return 0, err
+	}
+	return strconv.ParseInt(v, 10, 64)
+}
 
 func (s *Store) schemaVersion(ctx context.Context) (int, error) {
 	var n int

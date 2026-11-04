@@ -1,0 +1,71 @@
+[laptop] $ moolah init --base ILS --sync-dir $FOLDER
+Created the encryption key $TMP/config/age-key.txt. Keep a copy somewhere safe; copy it to your other computers.
+This book syncs through $FOLDER.
+Book "main" is ready in $TMP/data/books/main.db (base currency ILS).
+Next: add your accounts, for example:
+  moolah account add assets:bank:mybank --currency ILS --opening 1000
+  moolah category list
+
+[laptop] $ moolah account add assets:bank:leumi --currency ILS --opening 1000 --date 2026-10-01
+Added assets:bank:leumi (ILS).
+
+[desktop] $ moolah init --sync-dir $FOLDER --join
+Joined the book in the sync folder. Your data is up to date.
+Book "main" is ready in $TMP/data/books/main.db (base currency ILS).
+Next: add your accounts, for example:
+  moolah account add assets:bank:mybank --currency ILS --opening 1000
+  moolah category list
+
+[desktop] $ moolah balance
+Balances on 2026-11-04, in ILS
+
+Account           Balance  Value (ILS)
+assets                        1,000.00
+  bank                        1,000.00
+    leumi    1,000.00 ILS     1,000.00
+liabilities                       0.00
+
+Net worth                     1,000.00
+
+[desktop] $ moolah add leumi -100 food
+Added transaction 2 on 2026-11-04:
+  assets:bank:leumi              -100.00 ILS
+  expenses:food                  100.00 ILS
+
+[laptop] $ moolah register leumi
+ID  Date        Payee            Other side            Amount       Balance
+ 1  2026-10-01  Opening balance  equity:opening  1,000.00 ILS  1,000.00 ILS
+ 2  2026-11-04                   expenses:food    -100.00 ILS    900.00 ILS
+
+[laptop] $ moolah sync status
+Folder:   $FOLDER
+Computer: laptop-0001
+State:    up to date (snapshot 3 from desktop-0002, just now)
+
+[laptop] $ moolah --no-sync add leumi -20 food --payee offline
+Added transaction 3 on 2026-11-04 (offline):
+  assets:bank:leumi              -20.00 ILS
+  expenses:food                  20.00 ILS
+
+[desktop] $ moolah add leumi -7 food --payee coffee
+Added transaction 3 on 2026-11-04 (coffee):
+  assets:bank:leumi              -7.00 ILS
+  expenses:food                  7.00 ILS
+
+[laptop] $ moolah balance
+error: conflict: laptop-0001 and desktop-0002 both changed data since snapshot 3.
+  laptop-0001 (this computer): 1 transactions that the other side does not have
+  desktop-0002: 1 transactions that the other side does not have
+Choose the copy to keep: moolah sync resolve --keep laptop-0001 | --keep desktop-0002
+The other copy is saved as a backup.
+[exit 1]
+
+[laptop] $ moolah sync resolve --keep desktop-0002
+Kept the copy from desktop-0002. Saved the other copy as: $TMP/data/backups/moolah-main-conflict-laptop-0001-<time>.db.age
+
+[laptop] $ moolah register leumi
+ID  Date        Payee            Other side            Amount       Balance
+ 1  2026-10-01  Opening balance  equity:opening  1,000.00 ILS  1,000.00 ILS
+ 2  2026-11-04                   expenses:food    -100.00 ILS    900.00 ILS
+ 3  2026-11-04  coffee           expenses:food      -7.00 ILS    893.00 ILS
+

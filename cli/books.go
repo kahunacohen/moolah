@@ -1,8 +1,10 @@
 package cli
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"os"
 
 	"github.com/spf13/cobra"
 
@@ -13,8 +15,12 @@ import (
 type initFlags struct {
 	backupRecipient string
 	base            string
+	identity        string
+	join            bool
 	locale          string
 	noBackupKey     bool
+	noSync          bool
+	syncDir         string
 }
 
 func (f *initFlags) register(cmd *cobra.Command) {
@@ -22,19 +28,59 @@ func (f *initFlags) register(cmd *cobra.Command) {
 	cmd.Flags().StringVar(&f.locale, "locale", "", "language and number format: en_US or he_IL")
 	cmd.Flags().StringVar(&f.backupRecipient, "backup-recipient", "", "public key that encrypts backups (age1… or ssh-ed25519 …)")
 	cmd.Flags().BoolVar(&f.noBackupKey, "no-backup-key", false, "do not set a backup key (backups will ask for a passphrase)")
+	cmd.Flags().StringVar(&f.syncDir, "sync-dir", "", "folder that syncs this book with your other computers")
+	cmd.Flags().BoolVar(&f.join, "join", false, "with --sync-dir: join the book that is already in the folder")
+	cmd.Flags().StringVar(&f.identity, "identity", "", "private key file for sync (default: moolah's age key, else ~/.ssh/id_ed25519)")
 }
 
-// createBook asks the init questions (when interactive and not given as flags) and creates the book.
+func fileExists(p string) bool {
+	_, err := os.Stat(p)
+	return err == nil
+}
+
+// createBook asks the init questions (when interactive and not given as flags) and
+// creates the book, or joins one that is already in the sync folder.
 func (g *globals) createBook(f initFlags, loc app.Location) (*app.App, error) {
-	if loc.Book != "" && g.env.Paths.BookExists(loc.Book) {
-		return nil, fmt.Errorf("book %q already exists", loc.Book)
+	if fileExists(loc.Path) {
+		return nil, fmt.Errorf("book %q already exists", nameOr(loc.Book, loc.Path))
 	}
 	ask := g.env.Interactive
+	var err error
+	if f.syncDir == "" && ask && !f.noSync && !f.noBackupKey {
+		if f.syncDir, err = g.in.ask("Sync folder for your other computers (Enter to skip)", ""); err != nil {
+			return nil, err
+		}
+	}
+	if f.syncDir != "" {
+		head, err := app.SyncFolderInfo(f.syncDir)
+		if err != nil && !errors.Is(err, os.ErrNotExist) {
+			return nil, err
+		}
+		if head != nil {
+			join := f.join
+			if !join && ask {
+				if join, err = g.in.confirmDefault(fmt.Sprintf("This folder has moolah data (last change: %s, %s). Join it?",
+					head.Machine, head.ModTime.Local().Format("2006-01-02 15:04")), true); err != nil {
+					return nil, err
+				}
+			}
+			if !join {
+				return nil, fmt.Errorf("%s already has moolah data; use --join to join it, or choose an empty folder", f.syncDir)
+			}
+			a, err := app.Join(app.JoinParams{Book: loc.Book, Dir: f.syncDir, Identity: f.identity, Path: loc.Path,
+				Passphrase: func() (string, error) { return g.in.passphrase(false) }}, g.env.Paths)
+			if err != nil {
+				return nil, err
+			}
+			a.SetClock(g.env.Now)
+			fmt.Fprintln(g.out(), "Joined the book in the sync folder. Your data is up to date.")
+			return a, nil
+		}
+	}
 	if f.base == "" {
 		if !ask {
 			return nil, errors.New("--base is required, for example --base ILS")
 		}
-		var err error
 		if f.base, err = g.in.ask("Base currency", "ILS"); err != nil {
 			return nil, err
 		}
@@ -51,22 +97,9 @@ func (g *globals) createBook(f initFlags, loc app.Location) (*app.App, error) {
 			}
 		}
 	}
-	if f.backupRecipient == "" && !f.noBackupKey && ask {
-		def := app.DefaultSSHPublicKey()
-		hint := "none"
-		if def != "" {
-			hint = "~/.ssh/id_ed25519.pub"
-		}
-		ans, err := g.in.ask("Encryption key for backups (public key, or 'none' for a passphrase)", hint)
-		if err != nil {
+	if f.backupRecipient == "" && !f.noBackupKey {
+		if f.backupRecipient, err = g.chooseKey(ask, f.syncDir != ""); err != nil {
 			return nil, err
-		}
-		switch ans {
-		case "none", "":
-		case "~/.ssh/id_ed25519.pub":
-			f.backupRecipient = def
-		default:
-			f.backupRecipient = ans
 		}
 	}
 	a, err := app.Create(app.InitParams{
@@ -76,27 +109,80 @@ func (g *globals) createBook(f initFlags, loc app.Location) (*app.App, error) {
 		return nil, err
 	}
 	a.SetClock(g.env.Now)
+	a.Passphrase = func() (string, error) { return g.in.passphrase(false) }
+	if f.syncDir != "" {
+		if err := a.SyncInit(context.Background(), f.syncDir, f.identity); err != nil {
+			_ = a.Close()
+			return nil, fmt.Errorf("the book was created, but sync did not start: %w", err)
+		}
+		fmt.Fprintf(g.out(), "This book syncs through %s.\n", f.syncDir)
+	}
 	return a, nil
+}
+
+// chooseKey picks the public key that encrypts backups and snapshots. When sync is
+// wanted, a key is required, so moolah creates its own age key if there is none.
+func (g *globals) chooseKey(ask, needed bool) (string, error) {
+	if fileExists(g.env.Paths.KeyFile()) {
+		pub, _, err := g.env.Paths.Keygen()
+		return pub, err
+	}
+	ssh := app.DefaultSSHPublicKey()
+	if ask {
+		def := "new"
+		if ssh != "" {
+			def = "ssh"
+		}
+		hint := "Encryption key for backups and sync: 'new' (create one), 'ssh' (~/.ssh/id_ed25519.pub), a public key, or 'none' (a passphrase each time)"
+		ans, err := g.in.ask(hint, def)
+		if err != nil {
+			return "", err
+		}
+		switch ans {
+		case "none":
+			if needed {
+				return "", errors.New("sync needs a key; answer 'new' or 'ssh'")
+			}
+			return "", nil
+		case "ssh":
+			if ssh == "" {
+				return "", errors.New("~/.ssh/id_ed25519.pub does not exist")
+			}
+			return ssh, nil
+		case "new":
+		default:
+			return ans, nil
+		}
+	} else if !needed {
+		return "", nil
+	}
+	pub, _, err := g.env.Paths.Keygen()
+	if err != nil {
+		return "", err
+	}
+	fmt.Fprintf(g.out(), "Created the encryption key %s. Keep a copy somewhere safe; copy it to your other computers.\n", g.env.Paths.KeyFile())
+	return pub, nil
 }
 
 func initCmd(g *globals) *cobra.Command {
 	var f initFlags
 	cmd := &cobra.Command{
 		Use:   "init",
-		Short: "Create your book (asks for base currency, language and backup key)",
+		Short: "Create your book, or join one from your sync folder",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			loc, err := g.location()
 			if err != nil {
 				return err
 			}
+			f.noSync = g.noSync
 			a, err := g.createBook(f, loc)
 			if err != nil {
 				return err
 			}
 			defer a.Close()
 			base, _ := a.BaseCurrency(cmd.Context())
-			fmt.Fprintf(g.out(), "Created book %q in %s (base currency %s).\n", nameOr(loc.Book, loc.Path), loc.Path, base)
+			fmt.Fprintf(g.out(), "Book %q is ready in %s (base currency %s).\n", nameOr(loc.Book, loc.Path), loc.Path, base)
 			fmt.Fprintln(g.out(), "Next: add your accounts, for example:")
 			fmt.Fprintln(g.out(), "  moolah account add assets:bank:mybank --currency "+string(base)+" --opening 1000")
 			fmt.Fprintln(g.out(), "  moolah category list")
@@ -151,6 +237,7 @@ func bookCmd(g *globals) *cobra.Command {
 				return err
 			}
 			loc := app.Location{Book: args[0], Path: g.env.Paths.BookPath(args[0])}
+			f.noSync = g.noSync
 			a, err := g.createBook(f, loc)
 			if err != nil {
 				return err
@@ -189,7 +276,7 @@ func bookCmd(g *globals) *cobra.Command {
 
 	var yes bool
 	remove := &cobra.Command{
-		Use: "remove <name>", Short: "Delete a book and all its data (cannot be undone)", Args: cobra.ExactArgs(1),
+		Use: "remove <name>", Short: "Delete a book and all its data on this computer (cannot be undone)", Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if !yes {
 				ok, err := g.in.confirm(fmt.Sprintf("Delete book %q and all its data? Make a backup first", args[0]))

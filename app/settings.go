@@ -8,10 +8,8 @@ import (
 	"sort"
 	"strings"
 
-	"filippo.io/age"
-	"filippo.io/age/agessh"
-
 	"moolah/core"
+	"moolah/crypt"
 	"moolah/store"
 )
 
@@ -46,21 +44,10 @@ func validateSetting(key, value string) error {
 		}
 		return nil
 	case KeyBackupRecipient:
-		_, err := parseRecipient(value)
+		_, err := crypt.ParseRecipient(value)
 		return err
 	}
 	return fmt.Errorf("unknown setting %q: use one of %s", key, strings.Join(SettingKeys, ", "))
-}
-
-func parseRecipient(s string) (age.Recipient, error) {
-	s = strings.TrimSpace(s)
-	switch {
-	case strings.HasPrefix(s, "age1"):
-		return age.ParseX25519Recipient(s)
-	case strings.HasPrefix(s, "ssh-"):
-		return agessh.ParseRecipient(s)
-	}
-	return nil, fmt.Errorf("backup_recipient must be an age public key (age1…) or an SSH public key (ssh-ed25519 …)")
 }
 
 // Config returns one setting.

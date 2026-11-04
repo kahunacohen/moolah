@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -26,7 +27,7 @@ type session struct {
 
 func newSession(t *testing.T) *session {
 	dir := t.TempDir()
-	return &session{env: app.Paths{ConfigDir: filepath.Join(dir, "config"), DataDir: filepath.Join(dir, "data")}, t: t}
+	return &session{env: app.Paths{ConfigDir: filepath.Join(dir, "config"), DataDir: filepath.Join(dir, "data"), StateDir: filepath.Join(dir, "state")}, t: t}
 }
 
 func (s *session) run(line string) {
@@ -162,6 +163,61 @@ func TestScenarios(t *testing.T) {
 		s.run("book use nobody")
 		s.golden("books")
 	})
+}
+
+func TestSyncScenario(t *testing.T) {
+	// Two computers share one book through a folder: setup, changes both ways, a
+	// conflict that stops commands, and its resolution.
+	t.Run("two computers", func(t *testing.T) {
+		laptop, desktop := newSession(t), newSession(t)
+		folder := filepath.Join(t.TempDir(), "Dropbox")
+		writeMachineID(t, laptop, "laptop-0001")
+		writeMachineID(t, desktop, "desktop-0002")
+		var log bytes.Buffer
+		step := func(s *session, who, line string) {
+			s.log.Reset()
+			s.run(strings.ReplaceAll(line, "$FOLDER", folder))
+			log.WriteString("[" + who + "] " + strings.ReplaceAll(s.log.String(), folder, "$FOLDER"))
+		}
+		step(laptop, "laptop", "init --base ILS --sync-dir $FOLDER")
+		step(laptop, "laptop", "account add assets:bank:leumi --currency ILS --opening 1000 --date 2026-10-01")
+		key, err := os.ReadFile(laptop.env.KeyFile())
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.MkdirAll(desktop.env.ConfigDir, 0o700); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(desktop.env.KeyFile(), key, 0o600); err != nil {
+			t.Fatal(err)
+		}
+		step(desktop, "desktop", "init --sync-dir $FOLDER --join")
+		step(desktop, "desktop", "balance")
+		step(desktop, "desktop", "add leumi -100 food")
+		step(laptop, "laptop", "register leumi")
+		step(laptop, "laptop", "sync status")
+		step(laptop, "laptop", "--no-sync add leumi -20 food --payee offline")
+		step(desktop, "desktop", "add leumi -7 food --payee coffee")
+		step(laptop, "laptop", "balance")
+		step(laptop, "laptop", "sync resolve --keep desktop-0002")
+		step(laptop, "laptop", "register leumi")
+		got := log.String()
+		laptop.log.Reset()
+		laptop.log.WriteString(regexpBackupTime.ReplaceAllString(got, "<time>"))
+		laptop.golden("sync")
+	})
+}
+
+var regexpBackupTime = regexp.MustCompile(`\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}`)
+
+func writeMachineID(t *testing.T, s *session, id string) {
+	t.Helper()
+	if err := os.MkdirAll(s.env.StateDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(s.env.StateDir, "machine-id"), []byte(id), 0o600); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func TestEditFormat(t *testing.T) {

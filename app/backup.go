@@ -1,19 +1,16 @@
 package app
 
 import (
-	"bufio"
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"filippo.io/age"
-	"filippo.io/age/agessh"
-	"golang.org/x/crypto/ssh"
 
+	"moolah/crypt"
 	"moolah/store"
 )
 
@@ -23,19 +20,22 @@ type BackupParams struct {
 	Passphrase func() (string, error) // asked when backup_recipient is not set
 }
 
+func (a *App) recipient(ctx context.Context) (age.Recipient, error) {
+	s, _, err := a.st.Setting(ctx, KeyBackupRecipient)
+	if err != nil || s == "" {
+		return nil, err
+	}
+	return crypt.ParseRecipient(s)
+}
+
 // Backup writes an encrypted, consistent copy of the book and returns its path.
 // It encrypts to backup_recipient, or with a passphrase when that is not set.
 func (a *App) Backup(ctx context.Context, p BackupParams) (string, error) {
-	recipientStr, _, err := a.st.Setting(ctx, KeyBackupRecipient)
+	recipient, err := a.recipient(ctx)
 	if err != nil {
 		return "", err
 	}
-	var recipient age.Recipient
-	if recipientStr != "" {
-		if recipient, err = parseRecipient(recipientStr); err != nil {
-			return "", err
-		}
-	} else {
+	if recipient == nil {
 		if p.Passphrase == nil {
 			return "", fmt.Errorf("backup_recipient is not set and no passphrase was given")
 		}
@@ -56,6 +56,11 @@ func (a *App) Backup(ctx context.Context, p BackupParams) (string, error) {
 			return "", err
 		}
 	}
+	return a.encryptedCopy(ctx, dir, "", recipient)
+}
+
+// encryptedCopy writes moolah-<book>[-label]-<time>.db.age into dir.
+func (a *App) encryptedCopy(ctx context.Context, dir, label string, r age.Recipient) (string, error) {
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return "", err
 	}
@@ -63,71 +68,49 @@ func (a *App) Backup(ctx context.Context, p BackupParams) (string, error) {
 	if name == "" {
 		name = strings.TrimSuffix(filepath.Base(a.Path()), ".db")
 	}
+	if label != "" {
+		name += "-" + label
+	}
 	out := filepath.Join(dir, fmt.Sprintf("moolah-%s-%s.db.age", name, a.now().Format("2006-01-02T15-04-05")))
-
-	plainDir, err := os.MkdirTemp(filepath.Dir(a.Path()), ".backup-")
+	plain, cleanup, err := a.plainCopy(ctx)
 	if err != nil {
 		return "", err
 	}
-	defer os.RemoveAll(plainDir)
-	plain := filepath.Join(plainDir, "copy.db")
-	if err := a.st.VacuumInto(ctx, plain); err != nil {
-		return "", fmt.Errorf("copy database: %w", err)
-	}
-	if err := encryptFile(plain, out, recipient); err != nil {
+	defer cleanup()
+	if err := crypt.EncryptFile(plain, out, r); err != nil {
 		return "", err
 	}
 	return out, nil
 }
 
-func encryptFile(src, dst string, r age.Recipient) error {
-	in, err := os.Open(src)
+// plainCopy writes a consistent unencrypted copy next to the book (same file system,
+// same permissions) and returns a function that removes it.
+func (a *App) plainCopy(ctx context.Context) (string, func(), error) {
+	dir, err := os.MkdirTemp(filepath.Dir(a.Path()), ".copy-")
 	if err != nil {
-		return err
+		return "", nil, err
 	}
-	defer in.Close()
-	tmp := dst + ".tmp"
-	f, err := os.OpenFile(tmp, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
-	if err != nil {
-		return err
+	cleanup := func() { _ = os.RemoveAll(dir) }
+	plain := filepath.Join(dir, "copy.db")
+	if err := a.st.VacuumInto(ctx, plain); err != nil {
+		cleanup()
+		return "", nil, fmt.Errorf("copy database: %w", err)
 	}
-	w, err := age.Encrypt(f, r)
-	if err == nil {
-		_, err = io.Copy(w, in)
-	}
-	if err == nil {
-		err = w.Close()
-	}
-	if cerr := f.Close(); err == nil {
-		err = cerr
-	}
-	if err != nil {
-		_ = os.Remove(tmp)
-		return fmt.Errorf("encrypt backup: %w", err)
-	}
-	return os.Rename(tmp, dst)
+	return plain, cleanup, nil
 }
 
 // RestoreParams controls a restore.
 type RestoreParams struct {
 	File         string                 // the .age backup
-	IdentityFile string                 // age or SSH private key; ~/.ssh/id_ed25519 when empty
+	IdentityFile string                 // age or SSH private key
 	Passphrase   func() (string, error) // asked for passphrase-encrypted backups and SSH keys
 	Target       string                 // book file to write
 }
 
 // Restore decrypts a backup into Target, replacing it. The caller confirms first.
 func Restore(p RestoreParams) error {
-	f, err := os.Open(p.File)
+	scrypt, err := crypt.UsesPassphrase(p.File)
 	if err != nil {
-		return err
-	}
-	defer f.Close()
-	scrypt, err := usesPassphrase(f)
-	if err != nil {
-		return err
-	}
-	if _, err := f.Seek(0, io.SeekStart); err != nil {
 		return err
 	}
 	var ids []age.Identity
@@ -139,116 +122,45 @@ func Restore(p RestoreParams) error {
 		if err != nil {
 			return err
 		}
-		id, err := age.NewScryptIdentity(pass)
-		if err != nil {
+		if ids, err = crypt.PassphraseIdentity(pass); err != nil {
 			return err
 		}
-		ids = append(ids, id)
-	} else {
-		if ids, err = loadIdentities(p.IdentityFile, p.Passphrase); err != nil {
-			return err
-		}
-	}
-	r, err := age.Decrypt(f, ids...)
-	if err != nil {
-		var noMatch *age.NoIdentityMatchError
-		if errors.As(err, &noMatch) {
-			return fmt.Errorf("cannot decrypt %s: wrong key or passphrase", p.File)
-		}
-		return fmt.Errorf("decrypt %s: %w", p.File, err)
+	} else if ids, err = crypt.LoadIdentities(p.IdentityFile, p.Passphrase); err != nil {
+		return err
 	}
 	if err := os.MkdirAll(filepath.Dir(p.Target), 0o700); err != nil {
 		return err
 	}
 	tmp := p.Target + ".restore"
 	_ = os.Remove(tmp)
-	out, err := os.OpenFile(tmp, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
-	if err != nil {
+	if err := crypt.DecryptFile(p.File, tmp, ids); err != nil {
 		return err
 	}
-	_, err = io.Copy(out, r)
-	if cerr := out.Close(); err == nil {
-		err = cerr
-	}
-	if err != nil {
-		_ = os.Remove(tmp)
-		return fmt.Errorf("decrypt %s: %w", p.File, err)
-	}
-	st, err := store.Open(tmp, store.OpenOptions{})
+	return replaceDB(tmp, p.Target)
+}
+
+// replaceDB checks that src is a healthy moolah database and moves it over dst.
+func replaceDB(src, dst string) error {
+	st, err := store.Open(src, store.OpenOptions{})
 	if err == nil {
 		var problems []string
 		problems, err = st.IntegrityProblems(context.Background())
 		if err == nil && len(problems) > 0 {
-			err = fmt.Errorf("the backup is damaged: %s", strings.Join(problems, "; "))
+			err = fmt.Errorf("the copy is damaged: %s", strings.Join(problems, "; "))
 		}
-		_ = st.Close()
+		if cerr := st.Close(); err == nil {
+			err = cerr
+		}
 	}
 	if err != nil {
-		_ = os.Remove(tmp)
+		_ = os.Remove(src)
 		return err
 	}
 	for _, suffix := range []string{"-wal", "-shm"} {
-		_ = os.Remove(tmp + suffix)
-		if err := os.Remove(p.Target + suffix); err != nil && !errors.Is(err, os.ErrNotExist) {
+		_ = os.Remove(src + suffix)
+		if err := os.Remove(dst + suffix); err != nil && !errors.Is(err, os.ErrNotExist) {
 			return err
 		}
 	}
-	return os.Rename(tmp, p.Target)
-}
-
-// usesPassphrase reports whether an age file was encrypted with a passphrase.
-func usesPassphrase(r io.Reader) (bool, error) {
-	br := bufio.NewReader(r)
-	first, err := br.ReadString('\n')
-	if err != nil || !strings.HasPrefix(first, "age-encryption.org/") {
-		return false, fmt.Errorf("this is not a moolah backup (not an age file)")
-	}
-	for {
-		line, err := br.ReadString('\n')
-		if err != nil {
-			return false, fmt.Errorf("this backup file is damaged")
-		}
-		if strings.HasPrefix(line, "---") {
-			return false, nil
-		}
-		if strings.HasPrefix(line, "-> scrypt ") {
-			return true, nil
-		}
-	}
-}
-
-func loadIdentities(path string, passphrase func() (string, error)) ([]age.Identity, error) {
-	if path == "" {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			return nil, err
-		}
-		path = filepath.Join(home, ".ssh", "id_ed25519")
-	}
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil, fmt.Errorf("read key %s: %w. Give the key with --identity", path, err)
-	}
-	if strings.Contains(string(data), "AGE-SECRET-KEY-") {
-		return age.ParseIdentities(strings.NewReader(string(data)))
-	}
-	id, err := agessh.ParseIdentity(data)
-	if err == nil {
-		return []age.Identity{id}, nil
-	}
-	var missing *ssh.PassphraseMissingError
-	if !errors.As(err, &missing) || missing.PublicKey == nil {
-		return nil, fmt.Errorf("read key %s: %w", path, err)
-	}
-	if passphrase == nil {
-		return nil, fmt.Errorf("the key %s has a passphrase", path)
-	}
-	enc, err := agessh.NewEncryptedSSHIdentity(missing.PublicKey, data, func() ([]byte, error) {
-		s, err := passphrase()
-		return []byte(s), err
-	})
-	if err != nil {
-		return nil, err
-	}
-	return []age.Identity{enc}, nil
+	return os.Rename(src, dst)
 }

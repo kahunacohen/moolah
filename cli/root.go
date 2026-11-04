@@ -3,6 +3,7 @@
 package cli
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -34,6 +35,7 @@ type globals struct {
 	env    Env
 	format string
 	in     *prompter
+	noSync bool
 }
 
 // negativeNumber matches arguments such as -85 or -1,530.50, which the flag parser
@@ -74,14 +76,21 @@ func newRoot(g *globals) *cobra.Command {
 	root.PersistentFlags().StringVar(&g.book, "book", "", "use this book for one command (default: the current book)")
 	root.PersistentFlags().StringVar(&g.db, "db", "", "use this database file instead of a named book")
 	root.PersistentFlags().StringVar(&g.format, "format", "table", "output format: table, csv or json")
+	root.PersistentFlags().BoolVar(&g.noSync, "no-sync", false, "do not sync with other computers for this command")
 	root.AddCommand(
 		initCmd(g), bookCmd(g), accountCmd(g), categoryCmd(g), tagCmd(g),
 		addCmd(g), transferCmd(g), registerCmd(g), balanceCmd(g), valueCmd(g),
 		priceCmd(g), configCmd(g), backupCmd(g), restoreCmd(g), checkCmd(g),
-		editCmd(g), deleteCmd(g),
+		editCmd(g), deleteCmd(g), syncCmd(g),
 	)
+	for _, c := range extraCommands {
+		root.AddCommand(c(g))
+	}
 	return root
 }
+
+// extraCommands lets other files register commands.
+var extraCommands []func(*globals) *cobra.Command
 
 func (g *globals) location() (app.Location, error) {
 	return g.env.Paths.Resolve(app.ResolveParams{
@@ -100,16 +109,39 @@ func (g *globals) open() (*app.App, error) {
 		return nil, err
 	}
 	a.SetClock(g.env.Now)
+	a.Passphrase = func() (string, error) { return g.in.passphrase(false) }
 	return a, nil
 }
 
-// withBook opens the book, runs fn and closes the book.
+// withBook opens the book, loads newer data from the sync folder, runs fn, uploads
+// changes and closes the book. A sync conflict stops the command before fn runs.
 func (g *globals) withBook(fn func(a *app.App) error) error {
+	return g.withBookSync(!g.noSync, fn)
+}
+
+func (g *globals) withBookSync(sync bool, fn func(a *app.App) error) error {
 	a, err := g.open()
 	if err != nil {
 		return err
 	}
+	ctx := context.Background()
+	if sync {
+		warnings, err := a.SyncBefore(ctx)
+		for _, w := range warnings {
+			fmt.Fprintln(g.env.Stderr, "warning: "+w)
+		}
+		if err != nil {
+			_ = a.ReleaseLock(ctx)
+			_ = a.Close()
+			return err
+		}
+	}
 	err = fn(a)
+	if sync {
+		if serr := a.SyncAfter(ctx); serr != nil {
+			fmt.Fprintln(g.env.Stderr, "warning: your change is saved on this computer, but was not uploaded: "+serr.Error())
+		}
+	}
 	if cerr := a.Close(); err == nil {
 		err = cerr
 	}

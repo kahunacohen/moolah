@@ -12,6 +12,7 @@ import (
 
 	"moolah/app"
 	"moolah/core"
+	"moolah/crypt"
 )
 
 func priceCmd(g *globals) *cobra.Command {
@@ -205,6 +206,9 @@ func restoreCmd(g *globals) *cobra.Command {
 					return errors.New("not restored (use --yes to confirm without a prompt)")
 				}
 			}
+			if identity == "" {
+				identity = crypt.DefaultIdentityPath(g.env.Paths.ConfigDir)
+			}
 			err = app.Restore(app.RestoreParams{File: args[0], IdentityFile: identity, Target: loc.Path,
 				Passphrase: func() (string, error) { return g.in.passphrase(false) }})
 			if err != nil {
@@ -214,7 +218,7 @@ func restoreCmd(g *globals) *cobra.Command {
 			return nil
 		},
 	}
-	cmd.Flags().StringVar(&identity, "identity", "", "private key file (age or SSH; default ~/.ssh/id_ed25519)")
+	cmd.Flags().StringVar(&identity, "identity", "", "private key file (default: moolah's age key, else ~/.ssh/id_ed25519)")
 	cmd.Flags().BoolVar(&yes, "yes", false, "replace without asking")
 	return cmd
 }

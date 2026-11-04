@@ -15,8 +15,9 @@ const DefaultBook = "main"
 
 // Paths holds the directories moolah uses.
 type Paths struct {
-	ConfigDir string // ~/.config/moolah: current-book
+	ConfigDir string // ~/.config/moolah: current-book, sync settings per book, age key
 	DataDir   string // ~/.local/share/moolah: books/, backups/
+	StateDir  string // ~/.local/state/moolah: machine-id
 }
 
 // DefaultPaths returns the XDG directories for moolah.
@@ -33,7 +34,12 @@ func DefaultPaths() (Paths, error) {
 	if cfg == "" {
 		cfg = filepath.Join(home, ".config")
 	}
-	return Paths{ConfigDir: filepath.Join(cfg, "moolah"), DataDir: filepath.Join(data, "moolah")}, nil
+	state := os.Getenv("XDG_STATE_HOME")
+	if state == "" {
+		state = filepath.Join(home, ".local", "state")
+	}
+	return Paths{ConfigDir: filepath.Join(cfg, "moolah"), DataDir: filepath.Join(data, "moolah"),
+		StateDir: filepath.Join(state, "moolah")}, nil
 }
 
 var bookNameRe = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]{0,39}$`)

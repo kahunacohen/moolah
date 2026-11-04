@@ -46,6 +46,25 @@ func (p *prompter) confirm(question string) (bool, error) {
 	return ans == "y" || ans == "yes", nil
 }
 
+// confirmDefault asks a yes/no question where Enter means def.
+func (p *prompter) confirmDefault(question string, def bool) (bool, error) {
+	hint := "[y/N]"
+	if def {
+		hint = "[Y/n]"
+	}
+	ans, err := p.ask(question+" "+hint, "")
+	if err != nil {
+		return false, err
+	}
+	switch strings.ToLower(ans) {
+	case "":
+		return def, nil
+	case "y", "yes":
+		return true, nil
+	}
+	return false, nil
+}
+
 // passphrase returns MOOLAH_PASSPHRASE, or asks for one (twice when confirm is true).
 func (p *prompter) passphrase(confirm bool) (string, error) {
 	if v := p.env.Getenv("MOOLAH_PASSPHRASE"); v != "" {

@@ -19,7 +19,7 @@ var ctx = context.Background()
 func newBook(t *testing.T) *App {
 	t.Helper()
 	dir := t.TempDir()
-	paths := Paths{ConfigDir: filepath.Join(dir, "config"), DataDir: filepath.Join(dir, "data")}
+	paths := Paths{ConfigDir: filepath.Join(dir, "config"), DataDir: filepath.Join(dir, "data"), StateDir: filepath.Join(dir, "state")}
 	a, err := Create(InitParams{BaseCurrency: "ILS", Path: paths.BookPath("main")}, "main", paths)
 	if err != nil {
 		t.Fatal(err)
@@ -295,7 +295,7 @@ func TestBooks(t *testing.T) {
 	// The current book is remembered, and --book overrides it for one command only.
 	t.Run("resolve order", func(t *testing.T) {
 		dir := t.TempDir()
-		p := Paths{ConfigDir: filepath.Join(dir, "c"), DataDir: filepath.Join(dir, "d")}
+		p := Paths{ConfigDir: filepath.Join(dir, "c"), DataDir: filepath.Join(dir, "d"), StateDir: filepath.Join(dir, "s")}
 		loc, err := p.Resolve(ResolveParams{})
 		if err != nil || loc.Book != DefaultBook {
 			t.Fatalf("got %+v, %v", loc, err)
