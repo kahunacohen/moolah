@@ -1,0 +1,57 @@
+$ moolah init --base ILS --no-backup-key
+Created book "main" in $TMP/data/books/main.db (base currency ILS).
+Next: add your accounts, for example:
+  moolah account add assets:bank:mybank --currency ILS --opening 1000
+  moolah category list
+
+$ moolah account add assets:bank:leumi --currency ILS --opening 1000 --date 2026-10-01
+Added assets:bank:leumi (ILS).
+
+$ moolah category add food:restuarants
+Added category food:restuarants.
+
+$ moolah category add nosuch:child
+error: expenses:nosuch does not exist. Create the parent first
+[exit 1]
+
+$ moolah add leumi -50 restuarants --date 2026-10-02
+Added transaction 2 on 2026-10-02:
+  assets:bank:leumi              -50.00 ILS
+  expenses:food:restuarants      50.00 ILS
+
+$ moolah category rename food:restuarants food:eating-out
+Renamed food:restuarants to food:eating-out.
+
+$ moolah register --category eating-out
+ID  Date        Payee  Other side            Amount    Balance
+ 2  2026-10-02         assets:bank:leumi  50.00 ILS  50.00 ILS
+
+$ moolah category merge eating-out food:restaurants
+Merged eating-out into food:restaurants (1 transaction line moved).
+
+$ moolah register --category food:restaurants
+ID  Date        Payee  Other side            Amount    Balance
+ 2  2026-10-02         assets:bank:leumi  50.00 ILS  50.00 ILS
+
+$ moolah account close leumi --date 2026-10-31
+error: assets:bank:leumi has a balance of 950.00 ILS on 2026-10-31; move it to another account first
+[exit 1]
+
+$ moolah add pension 100 food
+error: income:salary:pension is a category; this needs a real account (assets or liabilities)
+[exit 1]
+
+$ moolah category add salary:bonus --income
+Added category income:salary:bonus.
+
+$ moolah account list
+Name         Currency  Closed
+assets
+  bank
+    leumi    ILS
+  cash
+  invest
+liabilities
+  card
+  loan
+

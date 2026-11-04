@@ -1,0 +1,129 @@
+$ moolah init --base ILS --no-backup-key
+Created book "main" in $TMP/data/books/main.db (base currency ILS).
+Next: add your accounts, for example:
+  moolah account add assets:bank:mybank --currency ILS --opening 1000
+  moolah category list
+
+$ moolah account add assets:bank:leumi --currency ILS --opening 25000 --date 2026-10-01
+Added assets:bank:leumi (ILS).
+
+$ moolah account add liabilities:card:chase --currency USD
+Added liabilities:card:chase (USD).
+
+$ moolah account add assets:invest:pension --currency ILS --opening 380000 --date 2026-01-01
+Added assets:invest:pension (ILS).
+
+$ moolah add leumi -200 food:groceries --payee Shufersal --date 2026-10-03
+Added transaction 3 on 2026-10-03 (Shufersal):
+  assets:bank:leumi              -200.00 ILS
+  expenses:food:groceries        200.00 ILS
+
+$ moolah add card:chase -42.17 shopping --payee Amazon --date 2026-10-05 --tag vacation-2026
+Added transaction 4 on 2026-10-05 (Amazon):
+  liabilities:card:chase         -42.17 USD
+  expenses:shopping              42.17 USD
+
+$ moolah add leumi -85 restaurnts
+error: unknown account "restaurnts". Did you mean expenses:food:restaurants?
+[exit 1]
+
+$ moolah add leumi -85 food
+Added transaction 5 on 2026-11-04:
+  assets:bank:leumi              -85.00 ILS
+  expenses:food                  85.00 ILS
+
+$ moolah add --payee Super-Pharm --date 2026-10-20 --posting leumi=-300 --posting health=180 --posting household=120
+Added transaction 6 on 2026-10-20 (Super-Pharm):
+  assets:bank:leumi              -300.00 ILS
+  expenses:health                180.00 ILS
+  expenses:household             120.00 ILS
+
+$ moolah transfer leumi card:chase 1530 --to-amount 420 --fee 15 --date 2026-11-01
+Added transaction 7 on 2026-11-01 (Transfer):
+  assets:bank:leumi              -1,545.00 ILS
+  liabilities:card:chase         420.00 USD (for 1,530.00 ILS)
+  expenses:fees                  15.00 ILS
+
+$ moolah add pension 2400 salary:pension --date 2026-02-10
+Added transaction 8 on 2026-02-10:
+  assets:invest:pension          2,400.00 ILS
+  income:salary:pension          -2,400.00 ILS
+
+$ moolah value pension 390000 --date 2026-10-31
+Booked a gain of 7,600.00 ILS (balance was 382,400.00 ILS). Transaction 9.
+
+$ moolah price add 2026-10-01 USD ILS 3.70
+Saved 1 USD = 3.7 ILS on 2026-10-01.
+
+$ moolah price add 2026-11-02 USD ILS 3.80
+Saved 1 USD = 3.8 ILS on 2026-11-02.
+
+$ moolah balance --date 2026-10-31
+Balances on 2026-10-31, in ILS
+
+Account             Balance  Value (ILS)
+assets                        414,500.00
+  bank                         24,500.00
+    leumi     24,500.00 ILS    24,500.00
+  invest                      390,000.00
+    pension  390,000.00 ILS   390,000.00
+liabilities                      -156.03
+  card                           -156.03
+    chase        -42.17 USD      -156.03
+
+Net worth                     414,343.97
+
+$ moolah balance
+Balances on 2026-11-04, in ILS
+
+Account             Balance  Value (ILS)
+assets                        412,870.00
+  bank                         22,870.00
+    leumi     22,870.00 ILS    22,870.00
+  invest                      390,000.00
+    pension  390,000.00 ILS   390,000.00
+liabilities                     1,435.75
+  card                          1,435.75
+    chase        377.83 USD     1,435.75
+
+Net worth                     414,305.75
+
+$ moolah balance --in USD
+Balances on 2026-11-04, in USD
+
+Account             Balance  Value (USD)
+assets                        108,650.00
+  bank                          6,018.42
+    leumi     22,870.00 ILS     6,018.42
+  invest                      102,631.58
+    pension  390,000.00 ILS   102,631.58
+liabilities                       377.83
+  card                            377.83
+    chase        377.83 USD       377.83
+
+Net worth                     109,027.83
+
+$ moolah register leumi
+ID  Date        Payee            Other side                                    Amount        Balance
+ 1  2026-10-01  Opening balance  equity:opening                         25,000.00 ILS  25,000.00 ILS
+ 3  2026-10-03  Shufersal        expenses:food:groceries                  -200.00 ILS  24,800.00 ILS
+ 6  2026-10-20  Super-Pharm      expenses:health, expenses:household      -300.00 ILS  24,500.00 ILS
+ 7  2026-11-01  Transfer         liabilities:card:chase, expenses:fees  -1,545.00 ILS  22,955.00 ILS
+ 5  2026-11-04                   expenses:food                             -85.00 ILS  22,870.00 ILS
+
+$ moolah register --category food
+ID  Date        Payee      Other side             Amount     Balance
+ 3  2026-10-03  Shufersal  assets:bank:leumi  200.00 ILS  200.00 ILS
+ 5  2026-11-04             assets:bank:leumi   85.00 ILS  285.00 ILS
+
+$ moolah register --tag vacation-2026
+ID  Date        Payee                  Other side                                    Amount
+ 4  2026-10-05  Amazon #vacation-2026  liabilities:card:chase, expenses:shopping  42.17 USD
+
+$ moolah tag list
+Tag            Transactions
+vacation-2026             1
+
+$ moolah check
+No problems found.
+

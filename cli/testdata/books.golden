@@ -1,0 +1,33 @@
+$ moolah init --base ILS --no-backup-key
+Created book "main" in $TMP/data/books/main.db (base currency ILS).
+Next: add your accounts, for example:
+  moolah account add assets:bank:mybank --currency ILS --opening 1000
+  moolah category list
+
+$ moolah book add mom --base USD --no-backup-key
+Created book "mom". Switch to it with: moolah book use mom
+
+$ moolah book list
+* main
+  mom
+
+$ moolah book use mom
+Now using book "mom".
+
+$ moolah config get base_currency
+USD
+
+$ moolah --book main config get base_currency
+ILS
+
+$ moolah book use main
+Now using book "main".
+
+$ moolah book list
+* main
+  mom
+
+$ moolah book use nobody
+error: book "nobody" does not exist. Create it with: moolah book add nobody
+[exit 1]
+
