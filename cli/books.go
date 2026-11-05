@@ -183,6 +183,9 @@ func initCmd(g *globals) *cobra.Command {
 			defer a.Close()
 			base, _ := a.BaseCurrency(cmd.Context())
 			fmt.Fprintf(g.out(), "Book %q is ready in %s (base currency %s).\n", nameOr(loc.Book, loc.Path), loc.Path, base)
+			if a.Joined {
+				return nil
+			}
 			fmt.Fprintln(g.out(), "Next: add your accounts, for example:")
 			fmt.Fprintln(g.out(), "  moolah account add assets:bank:mybank --currency "+string(base)+" --opening 1000")
 			fmt.Fprintln(g.out(), "  moolah category list")

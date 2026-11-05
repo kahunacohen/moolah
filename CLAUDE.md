@@ -14,7 +14,8 @@ The owner "vibe codes" it: Claude writes the code, and the owner checks behavior
 ```
 cmd/moolah  → cli
 cli, web    → app            (never store or SQL directly)
-app         → core, store, (later: prices, importers, sync)
+app         → core, store, crypt, syncdir, (later: prices, importers)
+syncdir     → crypt          (sync folder files only; no SQL)
 store       → core           (the only package with SQL)
 core        → nothing in this module (pure: no I/O, no SQL, no time.Now)
 ```

@@ -21,6 +21,7 @@ var Version = "dev"
 // App is one open book.
 type App struct {
 	Book       string                 // book name, or "" when opened with an explicit path
+	Joined     bool                   // created by joining a sync folder
 	Passphrase func() (string, error) // asked when a private key has a passphrase
 	Paths      Paths
 	now        func() time.Time

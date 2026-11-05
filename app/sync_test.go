@@ -178,7 +178,9 @@ func TestSync(t *testing.T) {
 		mustDo(t, func() error {
 			return os.WriteFile(filepath.Join(dir, ".tmp-"+syncdir.FileName(99, 1, "x-0000")+"-123"), []byte("partial"), 0o600)
 		})
-		mustDo(t, func() error { return os.WriteFile(filepath.Join(dir, syncdir.FileName(98, 1, "x-0000")+".part"), []byte("partial"), 0o600) })
+		mustDo(t, func() error {
+			return os.WriteFile(filepath.Join(dir, syncdir.FileName(98, 1, "x-0000")+".part"), []byte("partial"), 0o600)
+		})
 		a.command(t, nil)
 	})
 }

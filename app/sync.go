@@ -54,7 +54,11 @@ func (e *SyncConflictError) Error() string {
 		if s == e.Machine {
 			label += " (this computer)"
 		}
-		fmt.Fprintf(&b, "  %s: %d transactions that the other side does not have\n", label, e.Unique[s])
+		noun := "transactions"
+		if e.Unique[s] == 1 {
+			noun = "transaction"
+		}
+		fmt.Fprintf(&b, "  %s: %d %s that the other side does not have\n", label, e.Unique[s], noun)
 	}
 	keeps := make([]string, len(e.Sides))
 	for i, s := range e.Sides {
@@ -817,6 +821,7 @@ func Join(p JoinParams, paths Paths) (*App, error) {
 		return nil, err
 	}
 	a.Passphrase = p.Passphrase
+	a.Joined = true
 	ctx := context.Background()
 	if err := a.markSynced(ctx, heads[0].Gen); err != nil {
 		return nil, err

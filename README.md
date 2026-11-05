@@ -3,8 +3,8 @@
 A personal finance tool for the command line, with an optional browser UI that runs on your own computer.
 
 > **Status:** in development. This README describes the planned behavior.
-> **Works now:** books, accounts and categories, tags, `add`, `transfer`, `edit`, `delete`, `register`, `balance` (with `--in`), `value`, manual exchange rates (`price`), `config`, encrypted `backup`/`restore`, `check`.
-> **Not built yet:** sync between computers, automatic exchange-rate download, `report`, import, rules and review, `reconcile`, and the browser UI (`serve`).
+> **Works now:** books, accounts and categories, tags, `add`, `transfer`, `edit`, `delete`, `register`, `balance` (with `--in`), `value`, manual exchange rates (`price`), `config`, encrypted `backup`/`restore`, `check`, sync between computers (`sync`).
+> **Not built yet:** automatic exchange-rate download, `report`, import, rules and review, `reconcile`, and the browser UI (`serve`).
 
 moolah keeps track of your bank accounts, credit cards and retirement accounts in any currency, and reports everything in **one base currency that you choose** (for example Israeli shekels). Your data is one SQLite file on your computer. Nothing is sent anywhere, except requests for public exchange rates.
 
@@ -391,34 +391,38 @@ You can use moolah on several computers, for example a desktop at home and a lap
 | Moves automatically | Set up once on each machine |
 |---|---|
 | all transactions, accounts and categories | the `moolah` binary |
-| settings (base currency, language, …) | the private key that decrypts the data (for example your SSH key) |
+| settings (base currency, language, …) | the private key that decrypts the data (`~/.config/moolah/age-key.txt`, or your SSH key) |
 | import rules and your import profiles | — |
 | exchange rates already downloaded | — |
 
 ### Setting up the first machine
 
-`moolah init` asks for a sync folder. Give one now, or add it later with `moolah sync init <folder>`.
+`moolah init` first asks for a sync folder. Give one now, or add it later with `moolah sync init <folder>`.
 
 ```
 $ moolah init
+Sync folder for your other computers (Enter to skip): ~/Dropbox/moolah
 Base currency [ILS]: ILS
-Language [en_US]: he_IL
-Encryption key for backups and sync [~/.ssh/id_ed25519.pub]:
-Sync folder (Enter to skip): ~/Dropbox/moolah
-Created your books and the first snapshot in ~/Dropbox/moolah.
+Language (en_US, he_IL) [en_US]: he_IL
+Encryption key for backups and sync: 'new' (create one), 'ssh' (~/.ssh/id_ed25519.pub), a public key, or 'none' (a passphrase each time) [new]:
+Created the encryption key ~/.config/moolah/age-key.txt. Keep a copy somewhere safe; copy it to your other computers.
+This book syncs through ~/Dropbox/moolah.
 ```
+
+Sync needs an encryption key. **Copy the private key file to each of your computers** in a safe way (for example with `scp`), to the same path. Without it, a computer cannot read the synced data. `moolah sync keygen` creates the key later if you skipped it.
 
 ### Adding another machine
 
-Install moolah, make sure the private key is on this machine, wait until the sync folder is synced, then run `init` with the same folder:
+Install moolah, copy the private key to this machine, wait until the sync folder is synced, then run `init` with the same folder. moolah sees the existing data and joins it, so it asks nothing else:
 
 ```
 $ moolah init
-…
-Sync folder (Enter to skip): ~/Dropbox/moolah
-This folder has moolah data (last change: laptop, today 10:32). Join it? [Y/n]: y
-Joined. Your data is up to date.
+Sync folder for your other computers (Enter to skip): ~/Dropbox/moolah
+This folder has moolah data (last change: laptop-3f2a, 2026-11-04 10:32). Join it? [Y/n]:
+Joined the book in the sync folder. Your data is up to date.
 ```
+
+Without prompts: `moolah init --sync-dir ~/Dropbox/moolah --join`.
 
 ### Daily use
 
@@ -429,8 +433,12 @@ There is nothing extra to do.
 
 `moolah sync status` shows the state:
 ```
-up to date — snapshot 214 from laptop, 2 minutes ago
+Folder:   /home/you/Dropbox/moolah
+Computer: desktop-91c0
+State:    up to date (snapshot 214 from laptop-3f2a, 2 minutes ago)
 ```
+
+`moolah sync now` loads and uploads immediately. `--no-sync` skips sync for one command.
 
 ### Switching machines
 
@@ -447,11 +455,13 @@ Go back and close moolah there, or wait for your sync tool.
 ### If both machines changed data
 
 ```
-conflict: laptop and desktop both changed data since snapshot 212.
-  laptop:  4 transactions added, 1 category renamed
-  desktop: 1 import (card:max, 38 rows)
-Choose: moolah sync resolve --keep laptop | --keep desktop
+error: conflict: laptop-3f2a and desktop-91c0 both changed data since snapshot 212.
+  laptop-3f2a (this computer): 4 transactions that the other side does not have
+  desktop-91c0: 38 transactions that the other side does not have
+Choose the copy to keep: moolah sync resolve --keep laptop-3f2a | --keep desktop-91c0
+The other copy is saved as a backup.
 ```
+Every command stops with this message until you choose. Nothing changes before that.
 - The copy you don't keep is saved as a backup, so nothing is deleted.
 - Then redo the changes from the other copy. **Imports are easy to repeat:** import the same file again, and moolah skips rows it already has.
 - Usually, keep the side with the most manual work, and repeat the imports.
@@ -555,9 +565,6 @@ moolah config set base_currency USD
 | `offline` | `false` | `true`: never download exchange rates |
 | `rate_sources` | `boi,ecb` | order of exchange-rate sources |
 | `backup_dir` | see above | default backup folder |
-| `sync_dir` | none | sync folder for several computers; none means sync is off |
-| `sync_keep` | `20` | number of recent snapshots kept in the sync folder |
-| `sync_interval` | `30s` | how often `moolah serve` checks the sync folder |
 | `backup_recipient` | none | age public key or SSH public key for backups; none means a passphrase is used |
 
 Changing `base_currency` changes no stored data. Only reports change.
@@ -566,7 +573,7 @@ Changing `base_currency` changes no stored data. Only reports change.
 
 - **Your data is not encrypted inside the database file.** Protect it with **full-disk encryption** (for example LUKS). moolah creates the database with permissions `0600` (only your user can read it).
 - **Backups are always encrypted** with [age](https://age-encryption.org).
-- **Do not put the live database in a cloud-sync folder** (Dropbox, Google Drive, and so on). Sync tools can damage an open SQLite file, and the file is not encrypted. Use moolah's own sync (`sync_dir`), which puts only encrypted snapshots in the folder.
+- **Do not put the live database in a cloud-sync folder** (Dropbox, Google Drive, and so on). Sync tools can damage an open SQLite file, and the file is not encrypted. Use moolah's own sync (`moolah sync init`), which puts only encrypted snapshots in the folder.
 - **The browser UI** listens only on `127.0.0.1`. It is protected against other websites and local programs by a random session token, a `Host` header check (against DNS rebinding) and an `Origin` check with CSRF tokens on every change.
 - moolah never asks for or stores bank passwords.
 - An encrypted database file may be added in a later version.
@@ -610,10 +617,13 @@ moolah restore FILE --db /tmp/test.db           # restore to another file, to lo
 - Every snapshot records which snapshot it was based on. This is how moolah knows whether a newer snapshot continues your local data (load it) or both sides changed (conflict).
 - A new file is written for every change and renamed into place only when complete, so a sync tool never sees a half-written or shared file.
 - moolah keeps the last 20 snapshots and one per day for 30 days, and deletes older ones. Each computer deletes only its own files.
+- Each book has a hidden ID. A computer refuses to load a snapshot of a different book.
 - The computer's name comes from `~/.local/state/moolah/machine-id`. It is not inside the synced data.
 - Every computer needs the private key that matches `backup_recipient`, to decrypt snapshots.
 - `--no-sync` skips sync for one command. `moolah sync off` stops sync on this computer.
-- Settings: `sync_dir`, `sync_keep` (default 20), `sync_interval` for `moolah serve` (default 30 s).
+- The sync folder and key path are set **per computer** (they can differ between computers), in `~/.config/moolah/sync/<book-id>.json`. They are not book settings.
+- The decryption key is `~/.config/moolah/age-key.txt` if it exists, else `~/.ssh/id_ed25519`. Use `sync init --identity <file>` for another key.
+- `moolah serve` checks the sync folder every 30 seconds.
 
 ## Upgrades and database migrations
 

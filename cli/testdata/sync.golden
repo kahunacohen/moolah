@@ -12,9 +12,6 @@ Added assets:bank:leumi (ILS).
 [desktop] $ moolah init --sync-dir $FOLDER --join
 Joined the book in the sync folder. Your data is up to date.
 Book "main" is ready in $TMP/data/books/main.db (base currency ILS).
-Next: add your accounts, for example:
-  moolah account add assets:bank:mybank --currency ILS --opening 1000
-  moolah category list
 
 [desktop] $ moolah balance
 Balances on 2026-11-04, in ILS
@@ -54,8 +51,8 @@ Added transaction 3 on 2026-11-04 (coffee):
 
 [laptop] $ moolah balance
 error: conflict: laptop-0001 and desktop-0002 both changed data since snapshot 3.
-  laptop-0001 (this computer): 1 transactions that the other side does not have
-  desktop-0002: 1 transactions that the other side does not have
+  laptop-0001 (this computer): 1 transaction that the other side does not have
+  desktop-0002: 1 transaction that the other side does not have
 Choose the copy to keep: moolah sync resolve --keep laptop-0001 | --keep desktop-0002
 The other copy is saved as a backup.
 [exit 1]
