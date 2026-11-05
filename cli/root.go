@@ -21,6 +21,7 @@ type Env struct {
 	Getenv       func(string) string
 	Interactive  bool // stdin is a terminal
 	Now          func() time.Time
+	Offline      bool // never use the network (tests)
 	Paths        app.Paths
 	ReadPassword func(prompt string) (string, error)
 	RunEditor    func(path string) error
@@ -30,12 +31,13 @@ type Env struct {
 }
 
 type globals struct {
-	book   string
-	db     string
-	env    Env
-	format string
-	in     *prompter
-	noSync bool
+	book    string
+	db      string
+	env     Env
+	format  string
+	in      *prompter
+	noSync  bool
+	offline bool
 }
 
 // negativeNumber matches arguments such as -85 or -1,530.50, which the flag parser
@@ -77,6 +79,7 @@ func newRoot(g *globals) *cobra.Command {
 	root.PersistentFlags().StringVar(&g.db, "db", "", "use this database file instead of a named book")
 	root.PersistentFlags().StringVar(&g.format, "format", "table", "output format: table, csv or json")
 	root.PersistentFlags().BoolVar(&g.noSync, "no-sync", false, "do not sync with other computers for this command")
+	root.PersistentFlags().BoolVar(&g.offline, "offline", false, "do not download exchange rates for this command")
 	root.AddCommand(
 		initCmd(g), bookCmd(g), accountCmd(g), categoryCmd(g), tagCmd(g),
 		addCmd(g), transferCmd(g), registerCmd(g), balanceCmd(g), valueCmd(g),
@@ -109,6 +112,7 @@ func (g *globals) open() (*app.App, error) {
 		return nil, err
 	}
 	a.SetClock(g.env.Now)
+	a.Offline = g.offline || g.env.Offline
 	a.Passphrase = func() (string, error) { return g.in.passphrase(false) }
 	return a, nil
 }

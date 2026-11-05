@@ -22,7 +22,7 @@ const (
 )
 
 // SettingKeys lists the settings a user may change.
-var SettingKeys = []string{KeyBackupDir, KeyBackupRecipient, KeyBaseCurrency, KeyLocale}
+var SettingKeys = []string{KeyBackupDir, KeyBackupRecipient, KeyBaseCurrency, KeyLocale, KeyOffline}
 
 var locales = []string{"en_US", "he_IL"}
 
@@ -46,6 +46,11 @@ func validateSetting(key, value string) error {
 	case KeyBackupRecipient:
 		_, err := crypt.ParseRecipient(value)
 		return err
+	case KeyOffline:
+		if value != "true" && value != "false" {
+			return fmt.Errorf("offline must be true or false")
+		}
+		return nil
 	}
 	return fmt.Errorf("unknown setting %q: use one of %s", key, strings.Join(SettingKeys, ", "))
 }

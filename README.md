@@ -3,8 +3,8 @@
 A personal finance tool for the command line, with an optional browser UI that runs on your own computer.
 
 > **Status:** in development. This README describes the planned behavior.
-> **Works now:** books, accounts and categories, tags, `add`, `transfer`, `edit`, `delete`, `register`, `balance` (with `--in`), `value`, manual exchange rates (`price`), `config`, encrypted `backup`/`restore`, `check`, sync between computers (`sync`).
-> **Not built yet:** automatic exchange-rate download, `report`, import, rules and review, `reconcile`, and the browser UI (`serve`).
+> **Works now:** books, accounts and categories, tags, `add`, `transfer`, `edit`, `delete`, `register`, `balance` (with `--in`), `value`, exchange rates (`price`, `rates fetch`, automatic download), `report networth`, `report income`, `config`, encrypted `backup`/`restore`, `check`, sync between computers (`sync`).
+> **Not built yet:** import, rules and review, `reconcile`, and the browser UI (`serve`).
 
 moolah keeps track of your bank accounts, credit cards and retirement accounts in any currency, and reports everything in **one base currency that you choose** (for example Israeli shekels). Your data is one SQLite file on your computer. Nothing is sent anywhere, except requests for public exchange rates.
 
@@ -584,8 +584,8 @@ moolah connects to the network only to download exchange rates:
 
 | Host | When | Data sent |
 |---|---|---|
-| Bank of Israel (`boi.org.il`) | a report needs a missing rate, or `moolah rates fetch` | currency codes and date ranges |
-| Frankfurter / ECB (`api.frankfurter.app`) | the same, for pairs that BoI does not publish | currency codes and date ranges |
+| Bank of Israel (`edge.boi.gov.il`) | a report needs a missing rate, or `moolah rates fetch` | currency codes and date ranges |
+| Frankfurter / ECB (`api.frankfurter.dev`) | the same, for pairs that BoI does not publish | currency codes and date ranges |
 
 `moolah config set offline true` or `--offline` turns this off completely. Nothing else is sent: no telemetry, no update checks.
 

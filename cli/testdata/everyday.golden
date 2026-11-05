@@ -124,6 +124,54 @@ $ moolah tag list
 Tag            Transactions
 vacation-2026             1
 
+$ moolah report income --month 2026-10
+Income and spending 2026-10-01 to 2026-10-31, in ILS
+
+Category                 Value (ILS)
+Income
+  invest                    7,600.00
+    gains                   7,600.00
+Total income                7,600.00
+
+Spending
+  food                        200.00
+    groceries                 200.00
+  health                      180.00
+  household                   120.00
+  shopping                    156.03
+Total spending                656.03
+
+Net (income − spending)     6,943.97
+
+$ moolah report income --month 2026-10 --depth 1
+Income and spending 2026-10-01 to 2026-10-31, in ILS
+
+Category                 Value (ILS)
+Income
+  invest                    7,600.00
+Total income                7,600.00
+
+Spending
+  food                        200.00
+  health                      180.00
+  household                   120.00
+  shopping                    156.03
+Total spending                656.03
+
+Net (income − spending)     6,943.97
+
+$ moolah report networth --from 2026-10-01 --to 2026-11-04
+Net worth 2026-10-01 to 2026-11-04, in ILS
+
+                      Value (ILS)
+Net worth 2026-09-30   382,400.00
+  + opening balances    25,000.00
+  + income                   0.00
+  − spending              -756.03
+  + investment gains     7,600.00
+  + currency effect         61.78
+Net worth 2026-11-04   414,305.75
+
 $ moolah check
 No problems found.
 

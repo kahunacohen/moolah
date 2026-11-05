@@ -102,10 +102,11 @@ func parseAmount(s string, cur core.Currency) (decimal.Decimal, error) {
 
 // TxInfo is the descriptive part of a new transaction.
 type TxInfo struct {
-	Date  core.Date // today when zero
-	Note  string
-	Payee string
-	Tags  []string
+	ChargeDate core.Date // card charge date, optional
+	Date       core.Date // today when zero
+	Note       string
+	Payee      string
+	Tags       []string
 }
 
 // AddParams describes a simple transaction: an amount on one account, balanced by a category.
@@ -147,12 +148,13 @@ func (a *App) Add(ctx context.Context, p AddParams) (core.Transaction, error) {
 
 func (a *App) newTx(info TxInfo, postings []core.Posting) core.Transaction {
 	return core.Transaction{
-		Date:     a.dateOrToday(info.Date),
-		Kind:     core.KindNormal,
-		Note:     strings.TrimSpace(info.Note),
-		Payee:    strings.TrimSpace(info.Payee),
-		Postings: postings,
-		Tags:     info.Tags,
+		ChargeDate: info.ChargeDate,
+		Date:       a.dateOrToday(info.Date),
+		Kind:       core.KindNormal,
+		Note:       strings.TrimSpace(info.Note),
+		Payee:      strings.TrimSpace(info.Payee),
+		Postings:   postings,
+		Tags:       info.Tags,
 	}
 }
 

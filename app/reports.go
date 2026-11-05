@@ -68,10 +68,16 @@ func (a *App) Balances(ctx context.Context, p BalanceParams) (BalanceReport, err
 	if err != nil {
 		return BalanceReport{}, err
 	}
-	ix, err := a.PriceIndex(ctx)
-	if err != nil {
-		return BalanceReport{}, err
-	}
+	var rep BalanceReport
+	err = a.withRates(ctx, func(ix *core.PriceIndex) error {
+		var err error
+		rep, err = balanceReport(tree, balances, ix, cur, date)
+		return err
+	})
+	return rep, err
+}
+
+func balanceReport(tree *core.Tree, balances map[int64]core.Balance, ix *core.PriceIndex, cur core.Currency, date core.Date) (BalanceReport, error) {
 	rep := BalanceReport{Currency: cur, Date: date}
 
 	var visit func(id int64) (core.Balance, decimal.Decimal, error)

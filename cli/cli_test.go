@@ -37,6 +37,7 @@ func (s *session) run(line string) {
 		Getenv:      func(string) string { return "" },
 		Interactive: false,
 		Now:         func() time.Time { return time.Date(2026, 11, 4, 12, 0, 0, 0, time.UTC) },
+		Offline:     true,
 		Paths:       s.env,
 		Stderr:      &errOut,
 		Stdin:       strings.NewReader(""),
@@ -126,6 +127,9 @@ func TestScenarios(t *testing.T) {
 		s.run("register --category food")
 		s.run("register --tag vacation-2026")
 		s.run("tag list")
+		s.run("report income --month 2026-10")
+		s.run("report income --month 2026-10 --depth 1")
+		s.run("report networth --from 2026-10-01 --to 2026-11-04")
 		s.run("check")
 		s.golden("everyday")
 	})

@@ -25,6 +25,7 @@ func newBook(t *testing.T) *App {
 		t.Fatal(err)
 	}
 	a.SetClock(func() time.Time { return time.Date(2026, 11, 4, 12, 0, 0, 0, time.UTC) })
+	a.Offline = true // tests never use the network; tests with fake fetchers turn this off
 	t.Cleanup(func() { _ = a.Close() })
 	mustDo(t, func() error {
 		_, err := a.AddAccount(ctx, AddAccountParams{Path: "assets:bank:leumi", Currency: "ILS", Opening: "25000", OpeningDate: core.MustDate("2026-10-01")})
