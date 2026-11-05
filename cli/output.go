@@ -3,6 +3,7 @@ package cli
 import (
 	"encoding/csv"
 	"encoding/json"
+	"fmt"
 	"io"
 	"strings"
 	"unicode/utf8"
@@ -90,4 +91,12 @@ func (g *globals) render(t *table, v any) error {
 		return t.csv(g.out())
 	}
 	return t.print(g.out())
+}
+
+// count formats a number with a singular or plural noun: "1 transaction", "3 transactions".
+func count(n int, singular, plural string) string {
+	if n == 1 {
+		return "1 " + singular
+	}
+	return fmt.Sprintf("%d %s", n, plural)
 }

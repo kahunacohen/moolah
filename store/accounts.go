@@ -89,14 +89,25 @@ func (q Q) DeleteAccount(ctx context.Context, id int64) error {
 	return err
 }
 
-// MovePostings moves all postings from one account to another and bumps the
-// version of the affected transactions.
+// MovePostings moves all postings (and rules and import records) from one account
+// to another, and bumps the version of the affected transactions.
 func (q Q) MovePostings(ctx context.Context, from, to int64) error {
 	if _, err := q.q.ExecContext(ctx,
 		"UPDATE transactions SET version = version + 1 WHERE id IN (SELECT transaction_id FROM postings WHERE account_id = ?)", from); err != nil {
 		return err
 	}
-	_, err := q.q.ExecContext(ctx, "UPDATE postings SET account_id = ? WHERE account_id = ?", to, from)
+	for _, stmt := range []string{
+		"UPDATE postings SET account_id = ? WHERE account_id = ?",
+		"UPDATE rules SET account_id = ? WHERE account_id = ?",
+		"UPDATE import_rows SET account_id = ? WHERE account_id = ?",
+		"UPDATE import_batches SET account_id = ? WHERE account_id = ?",
+		"UPDATE OR IGNORE profile_accounts SET account_id = ? WHERE account_id = ?",
+	} {
+		if _, err := q.q.ExecContext(ctx, stmt, to, from); err != nil {
+			return err
+		}
+	}
+	_, err := q.q.ExecContext(ctx, "DELETE FROM profile_accounts WHERE account_id = ?", from)
 	return err
 }
 

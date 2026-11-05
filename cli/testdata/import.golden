@@ -1,0 +1,106 @@
+$ moolah init --base ILS --no-backup-key
+Book "main" is ready in $TMP/data/books/main.db (base currency ILS).
+Next: add your accounts, for example:
+  moolah account add assets:bank:mybank --currency ILS --opening 1000
+  moolah category list
+
+$ moolah account add assets:bank:leumi --currency ILS --opening 1000 --date 2026-09-30
+Added assets:bank:leumi (ILS).
+
+$ moolah profile list
+Name         Source    Description
+generic-csv  built-in  CSV with columns Date, Description, Amount (YYYY-MM-DD dates, negative = money out)
+
+$ moolah import $TMP/oct.csv
+error: which account is this file for? Add --account, for example --account card:max (moolah remembers it for next time)
+[exit 1]
+
+$ moolah import test $TMP/oct.csv --account leumi
+Profile generic-csv, account assets:bank:leumi. Nothing was saved (test only).
+
+Line  Date        Payee                       Amount  Category       Status
+   2  2026-10-01  SHUFERSAL DEAL 1234    -200.00 ILS  uncategorized  new
+   3  2026-10-02  Coffee                  -12.00 ILS  uncategorized  new
+   4  2026-10-02  Coffee                  -12.00 ILS  uncategorized  new
+   5  2026-10-05  Salary               18,500.00 ILS  uncategorized  new
+
+$ moolah import $TMP/oct.csv --account leumi
+Imported $TMP/oct.csv into assets:bank:leumi with profile generic-csv: 4 new.
+Import ID 1 (undo with: moolah import undo 1).
+4 rows have no category yet. Give them one with: moolah review
+
+$ moolah rule add shufersal food:groceries
+Added rule 1. It categorized 1 transaction that had no category.
+
+$ moolah rule add ^salary$ salary
+Added rule 2. It categorized 1 transaction that had no category.
+
+$ moolah import $TMP/oct-nov.csv
+Imported $TMP/oct-nov.csv into assets:bank:leumi with profile generic-csv: 1 new, 1 already imported.
+Import ID 2 (undo with: moolah import undo 2).
+
+$ moolah review
+2 transactions have no category. Set one with: moolah review set <id> <category>
+
+ID  Date        Payee   Account                Amount
+ 3  2026-10-02  Coffee  assets:bank:leumi  -12.00 ILS
+ 4  2026-10-02  Coffee  assets:bank:leumi  -12.00 ILS
+
+$ moolah review set 4 restaurants
+Transaction 4 → food:restaurants.
+
+$ moolah review set 5 restaurnts
+error: transaction 5 is not uncategorized
+[exit 1]
+
+$ moolah rule list
+ID  Pattern    Category        Amount  Tags
+ 1  shufersal  food:groceries
+ 2  ^salary$   income:salary
+
+$ moolah import list
+ID  When              File         Account            Profile      Rows  Created
+ 2  2026-11-04 12:00  oct-nov.csv  assets:bank:leumi  generic-csv     1        1
+ 1  2026-11-04 12:00  oct.csv      assets:bank:leumi  generic-csv     4        4
+
+$ moolah reconcile leumi --balance 19326 --date 2026-11-01
+Different: the statement says 19,326.00 ILS, moolah says 19,126.00 ILS (difference 200.00 ILS).
+
+Possible duplicates:
+  3 and 4: 2026-10-02 Coffee -12.00 ILS
+
+Latest transactions (check for missing ones):
+ID  Date        Payee                       Amount        Balance
+ 1  2026-09-30  Opening balance       1,000.00 ILS   1,000.00 ILS
+ 2  2026-10-01  SHUFERSAL DEAL 1234    -200.00 ILS     800.00 ILS
+ 3  2026-10-02  Coffee                  -12.00 ILS     788.00 ILS
+ 4  2026-10-02  Coffee                  -12.00 ILS     776.00 ILS
+ 5  2026-10-05  Salary               18,500.00 ILS  19,276.00 ILS
+ 6  2026-11-01  SHUFERSAL DEAL 9876    -150.00 ILS  19,126.00 ILS
+
+$ moolah reconcile leumi --balance 19314 --date 2026-11-01
+Different: the statement says 19,314.00 ILS, moolah says 19,126.00 ILS (difference 188.00 ILS).
+
+Possible duplicates:
+  3 and 4: 2026-10-02 Coffee -12.00 ILS
+
+Latest transactions (check for missing ones):
+ID  Date        Payee                       Amount        Balance
+ 1  2026-09-30  Opening balance       1,000.00 ILS   1,000.00 ILS
+ 2  2026-10-01  SHUFERSAL DEAL 1234    -200.00 ILS     800.00 ILS
+ 3  2026-10-02  Coffee                  -12.00 ILS     788.00 ILS
+ 4  2026-10-02  Coffee                  -12.00 ILS     776.00 ILS
+ 5  2026-10-05  Salary               18,500.00 ILS  19,276.00 ILS
+ 6  2026-11-01  SHUFERSAL DEAL 9876    -150.00 ILS  19,126.00 ILS
+
+$ moolah import undo 2
+Removed import 2 (1 transaction).
+
+$ moolah register leumi
+ID  Date        Payee                Other side                        Amount        Balance
+ 1  2026-09-30  Opening balance      equity:opening              1,000.00 ILS   1,000.00 ILS
+ 2  2026-10-01  SHUFERSAL DEAL 1234  expenses:food:groceries      -200.00 ILS     800.00 ILS
+ 3  2026-10-02  Coffee               expenses:uncategorized        -12.00 ILS     788.00 ILS
+ 4  2026-10-02  Coffee               expenses:food:restaurants     -12.00 ILS     776.00 ILS
+ 5  2026-10-05  Salary               income:salary              18,500.00 ILS  19,276.00 ILS
+

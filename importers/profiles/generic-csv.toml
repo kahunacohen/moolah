@@ -1,0 +1,13 @@
+# A simple CSV with English headers: Date, Description, Amount (and optional Reference).
+# Use it as a starting point for your own profile: moolah profile show generic-csv
+name = "generic-csv"
+description = "CSV with columns Date, Description, Amount (YYYY-MM-DD dates, negative = money out)"
+
+[detect]
+headers = ["Date", "Description", "Amount"]
+
+[columns]
+date = "Date"
+date_format = "2006-01-02"
+payee = "Description"
+amount = "Amount"

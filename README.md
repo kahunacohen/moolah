@@ -4,7 +4,8 @@ A personal finance tool for the command line, with an optional browser UI that r
 
 > **Status:** in development. This README describes the planned behavior.
 > **Works now:** books, accounts and categories, tags, `add`, `transfer`, `edit`, `delete`, `register`, `balance` (with `--in`), `value`, exchange rates (`price`, `rates fetch`, automatic download), `report networth`, `report income`, `config`, encrypted `backup`/`restore`, `check`, sync between computers (`sync`).
-> **Not built yet:** import, rules and review, `reconcile`, and the browser UI (`serve`).
+> **Also works:** import (CSV, XLSX, HTML-as-XLS) with TOML profiles, duplicate detection, rules, `review`, transfer matching, `import undo`, `reconcile`.
+> **Not built yet:** the browser UI (`serve`). Only one built-in profile ships (`generic-csv`); profiles for Israeli banks and cards will be added from real (anonymized) export files.
 
 moolah keeps track of your bank accounts, credit cards and retirement accounts in any currency, and reports everything in **one base currency that you choose** (for example Israeli shekels). Your data is one SQLite file on your computer. Nothing is sent anywhere, except requests for public exchange rates.
 
@@ -690,35 +691,36 @@ web/          browser UI (Go templates + htmx), embedded in the binary
 
 ### Adding an import profile
 
-A profile is a TOML file. No code change and no rebuild are needed.
+A profile is a small TOML file. No code change and no rebuild are needed. Profiles are stored in the book, so backups and sync include them.
 
-Profiles are stored in the moolah database, so `moolah backup` includes them.
-
-1. Start from a similar profile: `moolah profile show max-card > my-bank.toml`.
+1. Start from a similar profile: `moolah profile show generic-csv > my-bank.toml`.
 2. Change the name, header names, columns and date format to match your file. Example:
    ```toml
-   name   = "my-bank"
-   detect = { headers = ["תאריך", "תיאור", "חובה", "זכות"] }
+   name = "my-bank"
+
+   [detect]
+   headers = ["תאריך", "תיאור", "חובה", "זכות"]
 
    [table]
-   header_row = "auto"
-   stop_at    = { contains = "סה\"כ" }
+   stop = "סה\"כ"
 
    [columns]
-   date   = { column = "תאריך", format = "02/01/2006" }
-   payee  = "תיאור"
-   amount = { debit = "חובה", credit = "זכות" }
+   date = "תאריך"
+   date_format = "02/01/2006"
+   payee = "תיאור"
+   debit = "חובה"
+   credit = "זכות"
    ```
 3. Save it in moolah: `moolah profile add my-bank.toml`. moolah checks it and shows any error.
-4. Test it without importing anything: `moolah import test ~/Downloads/export.xls --profile my-bank`. Check that the dates, amounts and signs are correct.
+4. Test it without importing anything: `moolah import test ~/Downloads/export.xls --profile my-bank --account leumi`. Check that the dates, amounts and signs are correct.
 5. Fix things with `moolah profile edit my-bank` (opens your `$EDITOR` and checks the profile when you save).
 6. Import as usual. moolah finds the profile automatically from then on, and remembers which account it belongs to.
 
 Other commands: `moolah profile list`, `moolah profile export my-bank > my-bank.toml` (to share it), `moolah profile remove my-bank`.
 
-`docs/profiles.md` lists every key. If a file cannot be described with the existing keys, the engine needs a new generic option. That is a code change in `importers/`, with a test.
+[docs/profiles.md](docs/profiles.md) lists every key, with a card example (pending rows, foreign purchases, installments). If a file cannot be described with the existing keys, the engine needs a new generic option. That is a code change in `importers/`, with a test.
 
-**To add a built-in profile** (shipped in the binary): put the TOML in `importers/profiles/` and an anonymized sample file in `importers/testdata/<profile-name>/`. Remove personal details (names, account numbers, ID numbers) but keep the structure, headers and number formats exactly. `make check` runs a golden test for it. Never commit a real bank export.
+**To add a built-in profile** (shipped in the binary): put the TOML in `importers/profiles/` with an anonymized sample file and a test. Remove personal details (names, account numbers, ID numbers) but keep the structure, headers and number formats exactly. Never commit a real bank export.
 
 ## License
 

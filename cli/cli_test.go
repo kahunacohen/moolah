@@ -45,7 +45,7 @@ func (s *session) run(line string) {
 	}
 	code := Run(env, splitArgs(line))
 	tmp := filepath.Dir(s.env.DataDir)
-	fmt.Fprintf(&s.log, "$ moolah %s\n%s", line, strings.ReplaceAll(out.String(), tmp, "$TMP"))
+	fmt.Fprintf(&s.log, "$ moolah %s\n%s", strings.ReplaceAll(line, tmp, "$TMP"), strings.ReplaceAll(out.String(), tmp, "$TMP"))
 	if errOut.Len() > 0 {
 		s.log.WriteString(strings.ReplaceAll(errOut.String(), tmp, "$TMP"))
 	}
@@ -166,6 +166,40 @@ func TestScenarios(t *testing.T) {
 		s.run("book list")
 		s.run("book use nobody")
 		s.golden("books")
+	})
+}
+
+func TestImportScenario(t *testing.T) {
+	// The import flow: detect the format, skip duplicates, review, rules, reconcile and undo.
+	t.Run("bank csv", func(t *testing.T) {
+		s := newSession(t)
+		dir := filepath.Dir(s.env.DataDir)
+		write := func(name, text string) {
+			if err := os.WriteFile(filepath.Join(dir, name), []byte(text), 0o600); err != nil {
+				t.Fatal(err)
+			}
+		}
+		write("oct.csv", "Date,Description,Amount\n2026-10-01,SHUFERSAL DEAL 1234,-200.00\n2026-10-02,Coffee,-12\n2026-10-02,Coffee,-12\n2026-10-05,Salary,18500\n")
+		write("oct-nov.csv", "Date,Description,Amount\n2026-10-05,Salary,18500\n2026-11-01,SHUFERSAL DEAL 9876,-150.00\n")
+		s.run("init --base ILS --no-backup-key")
+		s.run("account add assets:bank:leumi --currency ILS --opening 1000 --date 2026-09-30")
+		s.run("profile list")
+		s.run("import " + filepath.Join(dir, "oct.csv"))
+		s.run("import test " + filepath.Join(dir, "oct.csv") + " --account leumi")
+		s.run("import " + filepath.Join(dir, "oct.csv") + " --account leumi")
+		s.run("rule add shufersal food:groceries")
+		s.run("rule add ^salary$ salary")
+		s.run("import " + filepath.Join(dir, "oct-nov.csv"))
+		s.run("review")
+		s.run("review set 4 restaurants")
+		s.run("review set 5 restaurnts")
+		s.run("rule list")
+		s.run("import list")
+		s.run("reconcile leumi --balance 19326 --date 2026-11-01")
+		s.run("reconcile leumi --balance 19314 --date 2026-11-01")
+		s.run("import undo 2")
+		s.run("register leumi")
+		s.golden("import")
 	})
 }
 

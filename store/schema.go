@@ -89,6 +89,48 @@ CREATE TABLE prices (
 `,
 	// v2: change counter for sync.
 	changeCounter("accounts", "transactions", "postings", "transaction_meta", "tags", "transaction_tags", "prices", "settings"),
+	// v3: import (profiles, batches, imported rows for duplicate detection and undo) and rules.
+	`
+CREATE TABLE import_profiles (
+	name       TEXT PRIMARY KEY,
+	toml       TEXT NOT NULL,
+	updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))
+);
+CREATE TABLE profile_accounts (
+	profile    TEXT NOT NULL,
+	account_id INTEGER NOT NULL REFERENCES accounts(id),
+	PRIMARY KEY (profile, account_id)
+);
+CREATE TABLE import_batches (
+	id         INTEGER PRIMARY KEY,
+	account_id INTEGER NOT NULL REFERENCES accounts(id),
+	profile    TEXT NOT NULL,
+	file_name  TEXT NOT NULL,
+	created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))
+);
+CREATE TABLE import_rows (
+	id             INTEGER PRIMARY KEY,
+	batch_id       INTEGER NOT NULL REFERENCES import_batches(id) ON DELETE CASCADE,
+	account_id     INTEGER NOT NULL REFERENCES accounts(id),
+	fingerprint    TEXT NOT NULL,
+	line           INTEGER NOT NULL,
+	raw            TEXT NOT NULL,
+	transaction_id INTEGER REFERENCES transactions(id) ON DELETE SET NULL,
+	matched        INTEGER NOT NULL DEFAULT 0 CHECK (matched IN (0, 1)),
+	UNIQUE (account_id, fingerprint)
+);
+CREATE INDEX import_rows_batch ON import_rows(batch_id);
+CREATE INDEX import_rows_transaction ON import_rows(transaction_id);
+CREATE TABLE rules (
+	id         INTEGER PRIMARY KEY,
+	position   INTEGER NOT NULL,
+	pattern    TEXT NOT NULL,
+	account_id INTEGER NOT NULL REFERENCES accounts(id),
+	min_amount TEXT,
+	max_amount TEXT,
+	tags       TEXT NOT NULL DEFAULT ''
+);
+` + changeCounter("import_profiles", "profile_accounts", "import_batches", "import_rows", "rules"),
 }
 
 // changeCounter adds triggers that increase meta.change_seq on every write to the
