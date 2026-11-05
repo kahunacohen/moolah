@@ -1,0 +1,14 @@
+{{define "content"}}
+<h1>{{.T "categories"}}</h1>
+<h2>{{.T "spending"}}</h2>
+<table>{{range .Data.Expenses}}<tr><td class="indent{{.Depth}}">{{.Name}}</td></tr>{{end}}</table>
+<h2>{{.T "income"}}</h2>
+<table>{{range .Data.Income}}<tr><td class="indent{{.Depth}}">{{.Name}}</td></tr>{{end}}</table>
+<h2>{{.T "categories.add"}}</h2>
+<form class="grid" method="post" action="/categories">
+  {{template "csrf" .}}
+  <label for="path">{{.T "categories.path"}}</label><input id="path" name="path" required value="{{.Data.Form.path}}">
+  <label for="income">{{.T "categories.income"}}</label><input id="income" name="income" type="checkbox" value="1">
+  <span></span><div><button>{{.T "save"}}</button></div>
+</form>
+{{end}}

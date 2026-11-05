@@ -1,0 +1,24 @@
+{{define "content"}}
+<form class="inline" method="get" action="/">
+  <div><label>{{.T "filter"}}</label><br>
+  <select name="account">
+    <option value="">{{.T "all_accounts"}}</option>
+    {{range .Data.Choices}}<option value="{{.}}" {{if eq . $.Data.Account}}selected{{end}}>{{.}}</option>{{end}}
+  </select></div>
+  <div><label>{{.T "tags"}}</label><br><input name="tag" value="{{.Data.Tag}}" size="12"></div>
+  <button class="secondary">{{.T "reports.show"}}</button>
+</form>
+{{if not .Data.Rows}}<p class="muted">{{.T "no_transactions"}}</p>{{else}}
+<table>
+<tr><th>{{.T "date"}}</th><th>{{.T "payee"}}</th><th>{{.T "other_side"}}</th><th class="num">{{.T "amount"}}</th>{{if .Data.Account}}<th class="num">{{.T "balance"}}</th>{{end}}</tr>
+{{range .Data.Rows}}
+<tr>
+  <td class="num"><a href="/tx/{{.ID}}">{{.Date}}</a></td>
+  <td>{{.Payee}}{{range .Tags}} <span class="tag">#{{.}}</span>{{end}}{{if .Note}}<br><span class="muted">{{.Note}}</span>{{end}}</td>
+  <td class="muted">{{.Other}}</td>
+  <td class="num {{if neg .Amount}}neg{{end}}">{{bal .Amount}}</td>
+  {{if $.Data.Account}}<td class="num">{{bal .Running}}</td>{{end}}
+</tr>
+{{end}}
+</table>{{end}}
+{{end}}

@@ -1,0 +1,24 @@
+{{define "content"}}
+<h1>{{.T "add.title"}}</h1>
+<form class="grid" method="post" action="/add">
+  {{template "csrf" .}}
+  <label for="account">{{.T "account"}}</label>
+  <select id="account" name="account" required>{{range .Data.Real}}<option value="{{.}}" {{if eq . $.Data.Form.account}}selected{{end}}>{{.}}</option>{{end}}</select>
+  <label for="amount">{{.T "amount"}}</label>
+  <input id="amount" name="amount" class="amount" inputmode="decimal" required value="{{.Data.Form.amount}}">
+  <span class="hint">{{.T "amount.hint"}}</span>
+  <label for="category">{{.T "category"}}</label>
+  <input id="category" name="category" list="categories" required value="{{.Data.Form.category}}" autocomplete="off">
+  <label for="date">{{.T "date"}}</label>
+  <input id="date" name="date" type="date" value="{{.Data.Form.date}}">
+  <label for="payee">{{.T "payee"}}</label>
+  <input id="payee" name="payee" value="{{.Data.Form.payee}}">
+  <label for="note">{{.T "note"}}</label>
+  <input id="note" name="note" value="{{.Data.Form.note}}">
+  <label for="tags">{{.T "tags"}}</label>
+  <input id="tags" name="tags" value="{{.Data.Form.tags}}">
+  <span class="hint">{{.T "tags.hint"}}</span>
+  <span></span><div><button>{{.T "save"}}</button></div>
+</form>
+{{template "categorylist" .Data}}
+{{end}}

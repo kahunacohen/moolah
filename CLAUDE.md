@@ -13,7 +13,8 @@ The owner "vibe codes" it: Claude writes the code, and the owner checks behavior
 ## Layer rules (do not break)
 ```
 cmd/moolah  → cli
-cli, web    → app            (never store or SQL directly)
+cli         → app, web       (web only to start "moolah serve")
+web         → app            (never store or SQL directly)
 app         → core, store, crypt, syncdir, prices, importers
 importers   → core           (file formats, profiles, rules; no SQL)
 syncdir     → crypt          (sync folder files only; no SQL)

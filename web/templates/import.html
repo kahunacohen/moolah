@@ -1,0 +1,22 @@
+{{define "content"}}
+<h1>{{.T "import.title"}}</h1>
+<form class="grid" method="post" action="/import" enctype="multipart/form-data">
+  {{template "csrf" .}}
+  <label for="file">{{.T "import.file"}}</label><input id="file" name="file" type="file" required>
+  <label for="account">{{.T "account"}}</label>
+  <select id="account" name="account"><option value="">({{.T "import.account_remembered"}})</option>{{range .Data.Real}}<option value="{{.}}">{{.}}</option>{{end}}</select>
+  <label for="profile">{{.T "import.profile"}}</label>
+  <select id="profile" name="profile"><option value="">{{.T "import.detect"}}</option>{{range .Data.Profiles}}<option value="{{.Name}}">{{.Name}}</option>{{end}}</select>
+  <label for="dry">{{.T "import.test"}}</label><input id="dry" name="dry" type="checkbox" value="1">
+  <span></span><div><button>{{.T "import.button"}}</button></div>
+</form>
+{{with .Data.Result}}
+<h2>{{$.T "import.result"}}: {{.Account}}, {{.Profile}}</h2>
+<p>{{.New}} {{$.T "import.new"}} · {{.Duplicates}} {{$.T "import.duplicate"}} · {{.Matched}} {{$.T "import.matched"}}{{if .Uncategorized}} · <a href="/review">{{.Uncategorized}} {{$.T "import.uncategorized"}}</a>{{end}}</p>
+<table>
+<tr><th class="num">{{$.T "line"}}</th><th>{{$.T "date"}}</th><th>{{$.T "payee"}}</th><th class="num">{{$.T "amount"}}</th><th>{{$.T "category"}}</th><th>{{$.T "status"}}</th></tr>
+{{range .Rows}}<tr><td class="num">{{.Line}}</td><td class="num">{{.Date}}</td><td>{{.Payee}}</td><td class="num">{{.Amount}}</td><td>{{.Category}}</td><td>{{$.T (printf "import.%s" .Status)}}</td></tr>{{end}}
+</table>
+{{range .Errors}}<div class="msg err">{{.}}</div>{{end}}
+{{end}}
+{{end}}

@@ -1,0 +1,29 @@
+{{define "content"}}
+<h1>{{.T "review.title"}}</h1>
+{{if not .Data.Items}}<p class="muted">{{.T "review.none"}}</p>{{else}}
+<table>
+<tr><th>{{.T "date"}}</th><th>{{.T "payee"}}</th><th>{{.T "account"}}</th><th class="num">{{.T "amount"}}</th><th>{{.T "category"}}</th></tr>
+{{range .Data.Items}}{{template "reviewrow" (rowctx $ .)}}{{end}}
+</table>{{end}}
+{{template "categorylist" .Data}}
+{{end}}
+
+{{define "reviewrow"}}
+<tr id="r{{.Item.Tx.ID}}">
+  <td class="num">{{.Item.Tx.Date}}</td>
+  <td>{{.Item.Tx.Payee}}</td>
+  <td class="muted">{{.Item.Account}}</td>
+  <td class="num {{if lt .Item.Amount.Value.Sign 0}}neg{{end}}">{{.Item.Amount}}</td>
+  <td>
+    {{if .Done}}→ {{.Done}}{{else}}
+    <form method="post" action="/review/{{.Item.Tx.ID}}" hx-post="/review/{{.Item.Tx.ID}}" hx-target="#r{{.Item.Tx.ID}}" hx-swap="outerHTML" class="inline tight">
+      <input type="hidden" name="csrf" value="{{.CSRF}}">
+      <input type="hidden" name="version" value="{{.Item.Tx.Version}}">
+      <input name="category" list="categories" required autocomplete="off">
+      <label><input type="checkbox" name="rule" value="1"> {{.T "review.rule"}}</label>
+      <button>{{.T "save"}}</button>
+    </form>
+    {{if .Error}}<div class="msg err">{{.Error}}</div>{{end}}{{end}}
+  </td>
+</tr>
+{{end}}

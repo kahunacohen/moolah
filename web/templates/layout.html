@@ -1,0 +1,37 @@
+{{define "layout"}}<!doctype html>
+<html lang="{{.Lang}}" dir="{{.Dir}}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="htmx-config" content='{"includeIndicatorStyles":false}'>
+<title>{{.Title}} · moolah</title>
+<link rel="stylesheet" href="/static/style.css">
+<script src="/static/htmx.min.js"></script>
+</head>
+<body hx-headers='{"X-CSRF-Token": "{{.CSRF}}"}'>
+<header>
+  <span class="brand">moolah</span>
+  {{if .Book}}<span class="book">{{.T "book"}}: {{.Book}}</span>{{end}}
+  <nav>
+    <a href="/" {{if eq .Nav "register"}}class="on"{{end}}>{{.T "nav.register"}}</a>
+    <a href="/add" {{if eq .Nav "add"}}class="on"{{end}}>{{.T "nav.add"}}</a>
+    <a href="/transfer" {{if eq .Nav "transfer"}}class="on"{{end}}>{{.T "nav.transfer"}}</a>
+    <a href="/review" {{if eq .Nav "review"}}class="on"{{end}}>{{.T "nav.review"}}{{if .ReviewCount}} ({{.ReviewCount}}){{end}}</a>
+    <a href="/import" {{if eq .Nav "import"}}class="on"{{end}}>{{.T "nav.import"}}</a>
+    <a href="/reports" {{if eq .Nav "reports"}}class="on"{{end}}>{{.T "nav.reports"}}</a>
+    <a href="/accounts" {{if eq .Nav "accounts"}}class="on"{{end}}>{{.T "nav.accounts"}}</a>
+    <a href="/categories" {{if eq .Nav "categories"}}class="on"{{end}}>{{.T "nav.categories"}}</a>
+  </nav>
+</header>
+<main>
+{{if .SyncMsg}}<div class="msg warn">{{.T "sync.warning"}}: {{.SyncMsg}}</div>{{end}}
+{{if .Flash}}<div class="msg ok">{{.Flash}}</div>{{end}}
+{{if .Error}}<div class="msg err">{{.Error}}</div>{{end}}
+{{template "content" .}}
+</main>
+</body>
+</html>{{end}}
+
+{{define "csrf"}}<input type="hidden" name="csrf" value="{{.CSRF}}">{{end}}
+{{define "accountlist"}}<datalist id="accounts">{{range .Accounts}}<option value="{{.}}">{{end}}</datalist>{{end}}
+{{define "categorylist"}}<datalist id="categories">{{range .Categories}}<option value="{{.}}">{{end}}</datalist>{{end}}

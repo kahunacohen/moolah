@@ -1,0 +1,33 @@
+{{define "content"}}
+<h1>{{.T "edit.title"}} {{.Data.ID}}</h1>
+<form method="post" action="/tx/{{.Data.ID}}">
+  {{template "csrf" .}}
+  <input type="hidden" name="version" value="{{.Data.Version}}">
+  <div class="gridbox">
+    <label for="date">{{.T "date"}}</label><input id="date" name="date" type="date" value="{{.Data.Date}}" required>
+    <label for="payee">{{.T "payee"}}</label><input id="payee" name="payee" value="{{.Data.Payee}}">
+    <label for="note">{{.T "note"}}</label><input id="note" name="note" value="{{.Data.Note}}">
+    <label for="tags">{{.T "tags"}}</label><input id="tags" name="tags" value="{{.Data.Tags}}">
+  </div>
+  <h2>{{.T "edit.lines"}}</h2>
+  <p class="muted">{{.T "edit.lines.hint"}}</p>
+  <table class="lines">
+  <tr><th>{{.T "account"}}</th><th class="num">{{.T "amount"}}</th><th>{{.T "currency"}}</th><th class="num">{{.T "edit.cost"}}</th><th></th></tr>
+  {{range .Data.Lines}}
+  <tr>
+    <td><input class="acct" name="acct" list="accounts" value="{{.Account}}" autocomplete="off"></td>
+    <td><input class="amount" name="amt" value="{{.Amount}}" inputmode="decimal"></td>
+    <td><input name="cur" value="{{.Currency}}" size="4"></td>
+    <td><input class="amount" name="cost" value="{{.Cost}}" inputmode="decimal"></td>
+    <td><input name="costcur" value="{{.CostCurrency}}" size="4"></td>
+  </tr>
+  {{end}}
+  </table>
+  <p><button>{{.T "save"}}</button></p>
+</form>
+<form method="post" action="/tx/{{.Data.ID}}/delete" hx-post="/tx/{{.Data.ID}}/delete" hx-confirm="{{.T "delete.confirm"}}" hx-target="body">
+  {{template "csrf" .}}
+  <button class="secondary">{{.T "delete"}}</button>
+</form>
+{{template "accountlist" .Data}}
+{{end}}

@@ -22,6 +22,7 @@ type Env struct {
 	Interactive  bool // stdin is a terminal
 	Now          func() time.Time
 	Offline      bool // never use the network (tests)
+	OpenBrowser  func(url string) error
 	Paths        app.Paths
 	ReadPassword func(prompt string) (string, error)
 	RunEditor    func(path string) error

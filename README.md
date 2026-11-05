@@ -5,7 +5,8 @@ A personal finance tool for the command line, with an optional browser UI that r
 > **Status:** in development. This README describes the planned behavior.
 > **Works now:** books, accounts and categories, tags, `add`, `transfer`, `edit`, `delete`, `register`, `balance` (with `--in`), `value`, exchange rates (`price`, `rates fetch`, automatic download), `report networth`, `report income`, `config`, encrypted `backup`/`restore`, `check`, sync between computers (`sync`).
 > **Also works:** import (CSV, XLSX, HTML-as-XLS) with TOML profiles, duplicate detection, rules, `review`, transfer matching, `import undo`, `reconcile`.
-> **Not built yet:** the browser UI (`serve`). Only one built-in profile ships (`generic-csv`); profiles for Israeli banks and cards will be added from real (anonymized) export files.
+> **Also works:** the browser UI (`serve`), in English or Hebrew (right-to-left).
+> **Not built yet:** only one built-in import profile ships (`generic-csv`); profiles for Israeli banks and cards will be added from real (anonymized) export files. Investment holdings and lots (levels B/C) are not planned for now.
 
 moolah keeps track of your bank accounts, credit cards and retirement accounts in any currency, and reports everything in **one base currency that you choose** (for example Israeli shekels). Your data is one SQLite file on your computer. Nothing is sent anywhere, except requests for public exchange rates.
 

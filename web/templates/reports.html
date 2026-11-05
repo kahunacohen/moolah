@@ -1,0 +1,45 @@
+{{define "content"}}
+<div class="tabs">
+  <a href="/reports?view=balance" {{if eq .Data.View "balance"}}class="on"{{end}}>{{.T "reports.balance"}}</a>
+  <a href="/reports?view=income" {{if eq .Data.View "income"}}class="on"{{end}}>{{.T "reports.income"}}</a>
+  <a href="/reports?view=networth" {{if eq .Data.View "networth"}}class="on"{{end}}>{{.T "reports.networth"}}</a>
+</div>
+<form class="inline" method="get" action="/reports">
+  <input type="hidden" name="view" value="{{.Data.View}}">
+  {{if eq .Data.View "income"}}<div><label>{{.T "reports.month"}}</label><br><input type="month" name="month" value="{{.Data.Month}}"></div>{{end}}
+  {{if eq .Data.View "networth"}}
+  <div><label>{{.T "reports.from"}}</label><br><input type="date" name="from" value="{{.Data.From}}"></div>
+  <div><label>{{.T "reports.to"}}</label><br><input type="date" name="to" value="{{.Data.To}}"></div>{{end}}
+  <div><label>{{.T "reports.in"}}</label><br><input name="in" value="{{.Data.In}}" size="4"></div>
+  {{if eq .Data.View "income"}}<div><label><input type="checkbox" name="by" value="charge-date" {{if .Data.ByCharge}}checked{{end}}> {{.T "reports.by_charge"}}</label></div>{{end}}
+  <button class="secondary">{{.T "reports.show"}}</button>
+</form>
+{{with .Data.Balance}}
+<table>
+<tr><th>{{$.T "account"}}</th><th class="num">{{$.T "balance"}}</th><th class="num">{{$.T "value"}} ({{.Currency}})</th></tr>
+{{range .Rows}}{{if or .HasAccounts (eq .Depth 0)}}<tr {{if eq .Depth 0}}class="total"{{end}}><td class="indent{{.Depth}}">{{leaf .Account}}</td>
+<td class="num">{{if .Currency}}{{money (index .Native .Currency) .Currency}} {{.Currency}}{{end}}</td>
+<td class="num {{if lt .Value.Sign 0}}neg{{end}}">{{money .Value $.Data.Balance.Currency}}</td></tr>{{end}}{{end}}
+<tr class="total"><td>{{$.T "reports.net_worth"}}</td><td></td><td class="num">{{money .NetWorth .Currency}}</td></tr>
+</table>{{end}}
+{{with .Data.Income}}
+<table>
+<tr><th>{{$.T "income"}}</th><th class="num">{{.Currency}}</th></tr>
+{{range .Income}}<tr><td class="indent{{.Depth}}">{{leafCat .Category}}</td><td class="num">{{money .Value $.Data.Income.Currency}}</td></tr>{{end}}
+<tr class="total"><td>{{$.T "reports.total_income"}}</td><td class="num">{{money .TotalIncome .Currency}}</td></tr>
+<tr><th>{{$.T "spending"}}</th><th></th></tr>
+{{range .Expenses}}<tr><td class="indent{{.Depth}}">{{leafCat .Category}}</td><td class="num">{{money .Value $.Data.Income.Currency}}</td></tr>{{end}}
+<tr class="total"><td>{{$.T "reports.total_spending"}}</td><td class="num">{{money .TotalExpenses .Currency}}</td></tr>
+<tr class="total"><td>{{$.T "reports.net"}}</td><td class="num {{if lt .Net.Sign 0}}neg{{end}}">{{money .Net .Currency}}</td></tr>
+</table>{{end}}
+{{with .Data.NetWorth}}
+<table>
+<tr class="total"><td>{{$.T "reports.net_worth"}} <span class="num">{{$.Data.StartDate}}</span></td><td class="num">{{money .Start .Currency}}</td></tr>
+{{if not .Opening.IsZero}}<tr><td class="indent1">+ {{$.T "reports.opening"}}</td><td class="num">{{money .Opening .Currency}}</td></tr>{{end}}
+<tr><td class="indent1">+ {{$.T "income"}}</td><td class="num">{{money .Income .Currency}}</td></tr>
+<tr><td class="indent1">− {{$.T "spending"}}</td><td class="num neg">{{money .Spending.Neg .Currency}}</td></tr>
+<tr><td class="indent1">+ {{$.T "reports.gains"}}</td><td class="num">{{money .Gains .Currency}}</td></tr>
+<tr><td class="indent1">+ {{$.T "reports.fx"}}</td><td class="num">{{money .FX .Currency}}</td></tr>
+<tr class="total"><td>{{$.T "reports.net_worth"}} <span class="num">{{.Period.To}}</span></td><td class="num">{{money .End .Currency}}</td></tr>
+</table>{{end}}
+{{end}}

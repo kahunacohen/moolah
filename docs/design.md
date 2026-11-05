@@ -1,5 +1,14 @@
 # moolah design
 
+> **Implementation notes (where the build differs from the plan below):**
+> - Import profiles use flat `[columns]` keys (`amount`, `negate`, `debit`, `credit`, …) instead of inline tables. Reference: `docs/profiles.md`.
+> - Every imported row becomes a transaction at once: in its rule's category, or in `expenses:uncategorized`. `review` then changes the category, so progress is always saved.
+> - Old binary `.xls` files are not supported (CSV, XLSX and HTML-as-XLS are).
+> - No starter rules for card companies: a rule needs the user's own card account. `rule add 'max' liabilities:card:max` does it in one line.
+> - The sync folder and key path are set per computer (`~/.config/moolah/sync/<book-id>.json`), not as book settings, because paths differ between computers. `moolah sync keygen` creates an age key.
+> - Transfer matching links same-currency rows only. A cross-currency transfer is recorded with `moolah transfer … --to-amount`.
+> - Only one built-in import profile (`generic-csv`) ships until real, anonymized Israeli bank/card exports are available.
+
 ## Context
 A personal money manager for one user who is comfortable on the command line.
 - Simple. One user, local data, no server or user accounts.

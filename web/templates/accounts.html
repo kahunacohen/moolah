@@ -1,0 +1,23 @@
+{{define "content"}}
+<h1>{{.T "accounts"}}</h1>
+<table>
+<tr><th>{{.T "account"}}</th><th class="num">{{.T "balance"}}</th><th class="num">{{.T "value"}} ({{.Data.Report.Currency}})</th></tr>
+{{range .Data.Report.Rows}}{{if or .HasAccounts (eq .Depth 0)}}
+<tr {{if eq .Depth 0}}class="total"{{end}}>
+  <td class="indent{{.Depth}}">{{leaf .Account}}</td>
+  <td class="num">{{if .Currency}}{{money (index .Native .Currency) .Currency}} {{.Currency}}{{end}}</td>
+  <td class="num {{if lt .Value.Sign 0}}neg{{end}}">{{money .Value $.Data.Report.Currency}}</td>
+</tr>{{end}}{{end}}
+<tr class="total"><td>{{.T "reports.net_worth"}}</td><td></td><td class="num">{{money .Data.Report.NetWorth .Data.Report.Currency}}</td></tr>
+</table>
+<h2>{{.T "accounts.add"}}</h2>
+<form class="grid" method="post" action="/accounts">
+  {{template "csrf" .}}
+  <label for="path">{{.T "accounts.path"}}</label><input id="path" name="path" required value="{{.Data.Form.path}}">
+  <label for="currency">{{.T "currency"}}</label><input id="currency" name="currency" size="4" value="{{.Data.Form.currency}}">
+  <span class="hint">{{.T "accounts.currency.hint"}}</span>
+  <label for="opening">{{.T "accounts.opening"}}</label><input id="opening" name="opening" class="amount" value="{{.Data.Form.opening}}">
+  <label for="date">{{.T "date"}}</label><input id="date" name="date" type="date" value="{{.Data.Form.date}}">
+  <span></span><div><button>{{.T "save"}}</button></div>
+</form>
+{{end}}

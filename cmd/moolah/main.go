@@ -24,6 +24,7 @@ func main() {
 		Getenv:       os.Getenv,
 		Interactive:  term.IsTerminal(int(os.Stdin.Fd())),
 		Now:          time.Now,
+		OpenBrowser:  openBrowser,
 		Paths:        paths,
 		ReadPassword: readPassword,
 		RunEditor:    runEditor,
@@ -53,4 +54,10 @@ func runEditor(path string) error {
 	cmd := exec.Command(parts[0], append(parts[1:], path)...)
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
 	return cmd.Run()
+}
+
+func openBrowser(url string) error {
+	cmd := exec.Command("xdg-open", url)
+	cmd.Stdout, cmd.Stderr = nil, nil
+	return cmd.Start()
 }

@@ -1,0 +1,22 @@
+{{define "content"}}
+<h1>{{.T "transfer.title"}}</h1>
+<form class="grid" method="post" action="/transfer">
+  {{template "csrf" .}}
+  <label for="from">{{.T "transfer.from"}}</label>
+  <select id="from" name="from">{{range .Data.Real}}<option value="{{.}}" {{if eq . $.Data.Form.from}}selected{{end}}>{{.}}</option>{{end}}</select>
+  <label for="to">{{.T "transfer.to"}}</label>
+  <select id="to" name="to">{{range .Data.Real}}<option value="{{.}}" {{if eq . $.Data.Form.to}}selected{{end}}>{{.}}</option>{{end}}</select>
+  <label for="amount">{{.T "amount"}}</label>
+  <input id="amount" name="amount" class="amount" inputmode="decimal" required value="{{.Data.Form.amount}}">
+  <label for="to_amount">{{.T "transfer.to_amount"}}</label>
+  <input id="to_amount" name="to_amount" class="amount" inputmode="decimal" value="{{.Data.Form.to_amount}}">
+  <span class="hint">{{.T "transfer.to_amount.hint"}}</span>
+  <label for="fee">{{.T "transfer.fee"}}</label>
+  <input id="fee" name="fee" class="amount" inputmode="decimal" value="{{.Data.Form.fee}}">
+  <label for="date">{{.T "date"}}</label>
+  <input id="date" name="date" type="date" value="{{.Data.Form.date}}">
+  <label for="payee">{{.T "payee"}}</label>
+  <input id="payee" name="payee" value="{{.Data.Form.payee}}">
+  <span></span><div><button>{{.T "save"}}</button></div>
+</form>
+{{end}}
