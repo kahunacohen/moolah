@@ -181,6 +181,15 @@ func TestSync(t *testing.T) {
 		mustDo(t, func() error {
 			return os.WriteFile(filepath.Join(dir, syncdir.FileName(98, 1, "x-0000")+".part"), []byte("partial"), 0o600)
 		})
-		a.command(t, nil)
+		snaps, err := syncdir.Folder{Dir: dir}.Snapshots()
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, sn := range snaps {
+			if sn.Gen >= 98 {
+				t.Fatalf("partial file read as snapshot %d", sn.Gen)
+			}
+		}
+		a.command(t, nil) // a command still works next to them
 	})
 }

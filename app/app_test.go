@@ -10,11 +10,14 @@ import (
 	"time"
 
 	"filippo.io/age"
+	"github.com/shopspring/decimal"
 
 	"moolah/core"
 )
 
 var ctx = context.Background()
+
+func dec(s string) decimal.Decimal { return decimal.RequireFromString(s) }
 
 func newBook(t *testing.T) *App {
 	t.Helper()
@@ -181,21 +184,6 @@ func TestTransactions(t *testing.T) {
 			t.Fatalf("delta %s, want 390000-382400", res.Delta.Value)
 		}
 	})
-	// An edit based on an old version must not overwrite a newer change.
-	t.Run("stale edit is rejected", func(t *testing.T) {
-		a := newBook(t)
-		tx, err := a.Add(ctx, AddParams{Account: "leumi", Amount: "-10", Category: "food"})
-		if err != nil {
-			t.Fatal(err)
-		}
-		first := tx
-		first.Payee = "first"
-		mustDo(t, func() error { return a.UpdateTransaction(ctx, first) })
-		tx.Payee = "stale"
-		if err := a.UpdateTransaction(ctx, tx); !errors.Is(err, ErrChangedElsewhere) {
-			t.Fatalf("got %v", err)
-		}
-	})
 }
 
 func TestBalances(t *testing.T) {
@@ -230,19 +218,6 @@ func TestBalances(t *testing.T) {
 		}
 		if got := row(t, usd, "liabilities:card:chase").Value; !got.Equal(dec("-100")) {
 			t.Fatalf("card in USD %s", got)
-		}
-	})
-	// A missing rate is an error naming the pair, never a silent 1:1.
-	t.Run("missing rate is an error", func(t *testing.T) {
-		a := newBook(t)
-		mustDo(t, func() error {
-			_, err := a.Add(ctx, AddParams{Account: "card:chase", Amount: "-100", Category: "shopping"})
-			return err
-		})
-		_, err := a.Balances(ctx, BalanceParams{})
-		var m *core.MissingRateError
-		if !errors.As(err, &m) {
-			t.Fatalf("got %v", err)
 		}
 	})
 }

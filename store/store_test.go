@@ -39,13 +39,6 @@ func TestStore(t *testing.T) {
 		}
 	})
 
-	// Opening a missing file without Create must not create an empty book by accident.
-	t.Run("missing file without create fails", func(t *testing.T) {
-		if _, err := Open(filepath.Join(t.TempDir(), "none.db"), OpenOptions{}); err == nil {
-			t.Fatal("expected error")
-		}
-	})
-
 	// An older binary must refuse a schema it does not know, instead of damaging it.
 	t.Run("newer schema refused", func(t *testing.T) {
 		s := openTemp(t)

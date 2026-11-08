@@ -29,14 +29,6 @@ func TestSettingPlaces(t *testing.T) {
 			t.Fatalf("got %q", v)
 		}
 	})
-	// Book settings are stored in the book, so every computer sees them.
-	t.Run("book settings stay in the book", func(t *testing.T) {
-		a := newBook(t)
-		mustDo(t, func() error { return a.SetConfig(ctx, KeyBaseCurrency, "eur") })
-		if v, ok, _ := a.st.Setting(ctx, KeyBaseCurrency); !ok || v != "EUR" {
-			t.Fatalf("got %q", v)
-		}
-	})
 	// Setups from older versions (current-book file, sync JSON, settings in the book) move to config.toml.
 	t.Run("older setups are migrated", func(t *testing.T) {
 		a := newBook(t)

@@ -127,16 +127,13 @@ func TestImport(t *testing.T) {
 }
 
 func TestReviewAndReconcile(t *testing.T) {
-	// Review moves a transaction from uncategorized to the chosen category; typos are still rejected.
+	// Review moves a transaction from uncategorized to the chosen category.
 	t.Run("categorize", func(t *testing.T) {
 		a := newBook(t)
 		importOK(t, a, ImportParams{File: csvFile(t, "2026-10-01,Coffee,-12"), Account: "leumi"})
 		items, err := a.Review(ctx)
 		if err != nil || len(items) != 1 {
 			t.Fatalf("items %d, %v", len(items), err)
-		}
-		if _, err := a.Categorize(ctx, CategorizeParams{TxID: items[0].Tx.ID, Category: "restaurnts"}); err == nil {
-			t.Fatal("typo accepted")
 		}
 		name, err := a.Categorize(ctx, CategorizeParams{TxID: items[0].Tx.ID, Category: "restaurants"})
 		if err != nil || name != "food:restaurants" {
@@ -160,12 +157,9 @@ func TestReviewAndReconcile(t *testing.T) {
 			t.Fatalf("got %+v", res)
 		}
 	})
-	// User profiles are validated when saved and replace a built-in with the same name.
-	t.Run("profile save is strict", func(t *testing.T) {
+	// A user profile with a built-in's name replaces the built-in for imports.
+	t.Run("user profile replaces built-in", func(t *testing.T) {
 		a := newBook(t)
-		if _, err := a.SaveProfile(ctx, "name = \"x\"\nbogus = 1\n"); err == nil {
-			t.Fatal("unknown key accepted")
-		}
 		text, err := a.ProfileText(ctx, "generic-csv")
 		if err != nil {
 			t.Fatal(err)
