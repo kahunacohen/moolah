@@ -131,6 +131,27 @@ CREATE TABLE rules (
 	tags       TEXT NOT NULL DEFAULT ''
 );
 ` + changeCounter("import_profiles", "profile_accounts", "import_batches", "import_rows", "rules"),
+	// v4: rate sources are user data (TOML), so prices.source is any source name.
+	// SQLite cannot drop a CHECK constraint, so the table is rebuilt; dropping it
+	// also drops its change-counter triggers, which are created again.
+	`
+CREATE TABLE prices_v4 (
+	date   TEXT NOT NULL,
+	base   TEXT NOT NULL,
+	quote  TEXT NOT NULL,
+	rate   TEXT NOT NULL,
+	source TEXT NOT NULL,
+	PRIMARY KEY (base, quote, date, source)
+);
+INSERT INTO prices_v4 (date, base, quote, rate, source) SELECT date, base, quote, rate, source FROM prices;
+DROP TABLE prices;
+ALTER TABLE prices_v4 RENAME TO prices;
+CREATE TABLE rate_sources (
+	name       TEXT PRIMARY KEY,
+	toml       TEXT NOT NULL,
+	updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))
+);
+` + changeCounter("prices", "rate_sources"),
 }
 
 // changeCounter adds triggers that increase meta.change_seq on every write to the

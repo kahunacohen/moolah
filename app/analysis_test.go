@@ -4,6 +4,7 @@ package app
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	"moolah/core"
@@ -16,7 +17,11 @@ type fakeFetcher struct {
 	prices []core.Price
 }
 
-func (f *fakeFetcher) Source() core.PriceSource { return core.SourceBOI }
+func (f *fakeFetcher) Name() core.PriceSource { return "fake" }
+
+func (f *fakeFetcher) Supports(base, quote core.Currency) bool {
+	return base == "USD" && quote == "ILS"
+}
 
 func (f *fakeFetcher) Fetch(ctx context.Context, base, quote core.Currency, from, to core.Date) ([]core.Price, error) {
 	f.calls++
@@ -27,7 +32,7 @@ func (f *fakeFetcher) Fetch(ctx context.Context, base, quote core.Currency, from
 }
 
 func usdPrice(date, rate string) core.Price {
-	return core.Price{Base: "USD", Quote: "ILS", Date: core.MustDate(date), Rate: dec(rate), Source: core.SourceBOI}
+	return core.Price{Base: "USD", Quote: "ILS", Date: core.MustDate(date), Rate: dec(rate), Source: "fake"}
 }
 
 func TestReports(t *testing.T) {
@@ -114,6 +119,46 @@ func TestReports(t *testing.T) {
 		}
 		if _, err := a.Balances(ctx, BalanceParams{}); err != nil || f.calls != 1 {
 			t.Fatalf("stored rates must be reused: calls %d", f.calls)
+		}
+	})
+}
+
+// stubSource publishes a fixed set of pairs.
+type stubSource struct {
+	name  core.PriceSource
+	pairs map[[2]core.Currency]bool
+}
+
+func (s stubSource) Name() core.PriceSource { return s.name }
+func (s stubSource) Supports(b, q core.Currency) bool {
+	return s.pairs[[2]core.Currency{b, q}]
+}
+func (s stubSource) Fetch(context.Context, core.Currency, core.Currency, core.Date, core.Date) ([]core.Price, error) {
+	return nil, nil
+}
+
+func TestPlanLegs(t *testing.T) {
+	local := stubSource{"local", map[[2]core.Currency]bool{{"USD", "XAA"}: true}}
+	world := stubSource{"world", map[[2]core.Currency]bool{{"USD", "EUR"}: true, {"THB", "EUR"}: true, {"XAA", "EUR"}: true}}
+	// Each currency is fetched against the report currency from the first source that publishes it.
+	t.Run("direct pair from the first source", func(t *testing.T) {
+		legs, missing := planLegs([]prices.Fetcher{local, world}, []core.Currency{"USD"}, "XAA", nil)
+		if len(missing) != 0 || len(legs) != 1 || legs[0].source.Name() != "local" {
+			t.Fatalf("legs %+v missing %v", legs, missing)
+		}
+	})
+	// Without a direct source, two legs through a shared currency are fetched instead.
+	t.Run("two legs through a pivot", func(t *testing.T) {
+		legs, missing := planLegs([]prices.Fetcher{world}, []core.Currency{"THB"}, "USD", []core.Currency{"EUR"})
+		if len(missing) != 0 || len(legs) != 2 || legs[0].quote != "EUR" || legs[1].base != "USD" {
+			t.Fatalf("legs %+v missing %v", legs, missing)
+		}
+	})
+	// A currency that no source publishes is reported, with how to add rates by hand.
+	t.Run("unpublished currency reported", func(t *testing.T) {
+		_, missing := planLegs([]prices.Fetcher{world}, []core.Currency{"NGN"}, "USD", []core.Currency{"EUR"})
+		if len(missing) != 1 || !strings.Contains(missing[0], "price add") {
+			t.Fatalf("missing %v", missing)
 		}
 	})
 }

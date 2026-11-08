@@ -155,11 +155,11 @@ func TestTransactionValidate(t *testing.T) {
 
 func TestPriceIndex(t *testing.T) {
 	ix := NewPriceIndex([]Price{
-		{Base: "USD", Quote: "ILS", Date: MustDate("2026-10-01"), Rate: dec("3.70"), Source: SourceBOI},
-		{Base: "USD", Quote: "ILS", Date: MustDate("2026-10-20"), Rate: dec("3.80"), Source: SourceBOI},
+		{Base: "USD", Quote: "ILS", Date: MustDate("2026-10-01"), Rate: dec("3.70"), Source: "central"},
+		{Base: "USD", Quote: "ILS", Date: MustDate("2026-10-20"), Rate: dec("3.80"), Source: "central"},
 		{Base: "USD", Quote: "ILS", Date: MustDate("2026-10-20"), Rate: dec("3.90"), Source: SourceManual},
 		{Base: "EUR", Quote: "ILS", Date: MustDate("2026-10-01"), Rate: dec("4.00"), Source: SourceManual},
-	})
+	}, IndexOptions{Order: []PriceSource{"central"}})
 	// The rate used is the latest one on or before the date (weekends use the last business day).
 	t.Run("latest on or before", func(t *testing.T) {
 		r, err := ix.Rate("USD", "ILS", MustDate("2026-10-19"))
@@ -167,7 +167,7 @@ func TestPriceIndex(t *testing.T) {
 			t.Fatalf("got %s, %v", r, err)
 		}
 	})
-	// On the same date, the official source beats a manual rate.
+	// On the same date, a downloaded rate from a listed source beats a manual rate.
 	t.Run("source priority", func(t *testing.T) {
 		r, _ := ix.Rate("USD", "ILS", MustDate("2026-10-25"))
 		if !r.Equal(dec("3.80")) {
@@ -181,11 +181,40 @@ func TestPriceIndex(t *testing.T) {
 			t.Fatalf("got %s, %v", v, err)
 		}
 	})
-	// Pairs without a direct rate are converted through ILS.
+	// Pairs without a direct rate are converted through a currency that has both legs.
 	t.Run("cross rate", func(t *testing.T) {
 		r, err := ix.Rate("EUR", "USD", MustDate("2026-10-02"))
 		if err != nil || !r.Round(4).Equal(dec("1.0811")) {
 			t.Fatalf("got %s, %v", r, err)
+		}
+	})
+	// The order of sources is configurable: the first listed source wins on the same date.
+	t.Run("source order is configurable", func(t *testing.T) {
+		ps := []Price{
+			{Base: "USD", Quote: "EUR", Date: MustDate("2026-10-01"), Rate: dec("0.90"), Source: "a"},
+			{Base: "USD", Quote: "EUR", Date: MustDate("2026-10-01"), Rate: dec("0.91"), Source: "b"},
+		}
+		for _, c := range []struct {
+			first PriceSource
+			want  string
+		}{{"a", "0.90"}, {"b", "0.91"}} {
+			r, _ := NewPriceIndex(ps, IndexOptions{Order: []PriceSource{c.first}}).Rate("USD", "EUR", MustDate("2026-10-02"))
+			if !r.Equal(dec(c.want)) {
+				t.Fatalf("order %s: got %s", c.first, r)
+			}
+		}
+	})
+	// Cross rates prefer the pivot given first (the base currency), whatever currency it is.
+	t.Run("pivot preference", func(t *testing.T) {
+		ps := []Price{
+			{Base: "GBP", Quote: "EUR", Date: MustDate("2026-10-01"), Rate: dec("1.20"), Source: "a"},
+			{Base: "CHF", Quote: "EUR", Date: MustDate("2026-10-01"), Rate: dec("1.00"), Source: "a"},
+			{Base: "GBP", Quote: "AUD", Date: MustDate("2026-10-01"), Rate: dec("9.00"), Source: "a"},
+			{Base: "CHF", Quote: "AUD", Date: MustDate("2026-10-01"), Rate: dec("1.00"), Source: "a"},
+		}
+		r, err := NewPriceIndex(ps, IndexOptions{Pivots: []Currency{"EUR"}}).Rate("GBP", "CHF", MustDate("2026-10-02"))
+		if err != nil || !r.Equal(dec("1.2")) {
+			t.Fatalf("via EUR: got %s, %v", r, err)
 		}
 	})
 	// A missing rate is an error that names the pair and date; never a silent 1:1.

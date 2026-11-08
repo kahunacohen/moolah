@@ -12,30 +12,12 @@ const rateScale = 10
 // PriceSource tells where an exchange rate came from.
 type PriceSource string
 
-// Price sources, in priority order (first wins on the same date).
+// Price sources that are not downloaded. Downloaded rates use the name of their
+// rate source (for example "ecb"), which comes from its TOML definition.
 const (
-	SourceBOI    PriceSource = "boi"    // Bank of Israel representative rates
-	SourceECB    PriceSource = "ecb"    // European Central Bank reference rates
 	SourceManual PriceSource = "manual" // entered by the user
 	SourceTx     PriceSource = "tx"     // implied by a transaction with two currencies
 )
-
-// Valid reports whether s is a known source.
-func (s PriceSource) Valid() bool { return s.priority() < 4 }
-
-func (s PriceSource) priority() int {
-	switch s {
-	case SourceBOI:
-		return 0
-	case SourceECB:
-		return 1
-	case SourceManual:
-		return 2
-	case SourceTx:
-		return 3
-	}
-	return 4
-}
 
 // Price is an exchange rate: 1 Base = Rate Quote on Date.
 type Price struct {
@@ -68,24 +50,64 @@ type quote struct {
 
 // PriceIndex answers "what is the rate from X to Y on date D".
 type PriceIndex struct {
-	pairs map[pairKey][]quote // sorted by date, then best first
+	pairs  map[pairKey][]quote // sorted by date, then best last
+	pivots []Currency          // tried in this order for cross rates
 }
 
-// crossVia are the currencies tried for cross rates, in order.
-var crossVia = []Currency{"ILS", "USD"}
+// IndexOptions controls how rates are chosen.
+type IndexOptions struct {
+	// Order lists downloaded sources from most to least trusted. On the same date,
+	// a listed source wins over an unlisted one, any downloaded rate wins over a
+	// manual one, and a manual one wins over a rate implied by a transaction.
+	Order []PriceSource
+	// Pivots are tried first for cross rates (usually the base currency); after
+	// them, every other currency with rates is tried, in alphabetical order.
+	Pivots []Currency
+}
+
+func priority(s PriceSource, order []PriceSource) int {
+	for i, o := range order {
+		if s == o {
+			return i
+		}
+	}
+	switch s {
+	case SourceManual:
+		return len(order) + 1
+	case SourceTx:
+		return len(order) + 2
+	}
+	return len(order)
+}
 
 // NewPriceIndex indexes prices in both directions.
-func NewPriceIndex(prices []Price) *PriceIndex {
+func NewPriceIndex(prices []Price, opts IndexOptions) *PriceIndex {
 	ix := &PriceIndex{pairs: map[pairKey][]quote{}}
+	seen := map[Currency]bool{}
+	for _, c := range opts.Pivots {
+		if !seen[c] {
+			seen[c] = true
+			ix.pivots = append(ix.pivots, c)
+		}
+	}
+	var others []Currency
 	for _, p := range prices {
 		if p.Rate.Sign() <= 0 || p.Base == p.Quote {
 			continue
 		}
-		pr := p.Source.priority()
+		for _, c := range []Currency{p.Base, p.Quote} {
+			if !seen[c] {
+				seen[c] = true
+				others = append(others, c)
+			}
+		}
+		pr := priority(p.Source, opts.Order)
 		ix.add(pairKey{p.Base, p.Quote}, quote{date: p.Date, priority: pr, rate: p.Rate})
 		ix.add(pairKey{p.Quote, p.Base}, quote{date: p.Date, priority: pr, inverse: true,
 			rate: decimal.NewFromInt(1).DivRound(p.Rate, rateScale)})
 	}
+	sort.Slice(others, func(i, j int) bool { return others[i] < others[j] })
+	ix.pivots = append(ix.pivots, others...)
 	for k, qs := range ix.pairs {
 		sort.SliceStable(qs, func(i, j int) bool {
 			if !qs[i].date.t.Equal(qs[j].date.t) {
@@ -114,7 +136,7 @@ func (ix *PriceIndex) direct(from, to Currency, date Date) (decimal.Decimal, boo
 }
 
 // Rate returns the rate to convert 1 unit of from into to, using the latest rate on
-// or before date. It tries the direct pair, then cross rates through ILS and USD.
+// or before date. It tries the direct pair, then cross rates through the pivots.
 func (ix *PriceIndex) Rate(from, to Currency, date Date) (decimal.Decimal, error) {
 	if from == to {
 		return decimal.NewFromInt(1), nil
@@ -122,7 +144,7 @@ func (ix *PriceIndex) Rate(from, to Currency, date Date) (decimal.Decimal, error
 	if r, ok := ix.direct(from, to, date); ok {
 		return r, nil
 	}
-	for _, via := range crossVia {
+	for _, via := range ix.pivots {
 		if via == from || via == to {
 			continue
 		}

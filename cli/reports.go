@@ -166,14 +166,23 @@ func leaf(path string, depth int) string {
 }
 
 func ratesCmd(g *globals) *cobra.Command {
-	cmd := &cobra.Command{Use: "rates", Short: "Download exchange rates (Bank of Israel, ECB)"}
+	cmd := &cobra.Command{Use: "rates", Short: "Download exchange rates from the rate sources (see: moolah source list)"}
+	var in string
 	fetch := &cobra.Command{
 		Use: "fetch", Short: "Download missing daily rates for the currencies this book uses", Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			var quote core.Currency
+			if in != "" {
+				c, err := core.ParseCurrency(in)
+				if err != nil {
+					return err
+				}
+				quote = c
+			}
 			return g.withBook(func(a *app.App) error {
-				res, err := a.FetchRates(cmd.Context())
+				res, err := a.FetchRates(cmd.Context(), quote)
 				if res.Added > 0 || err == nil {
-					fmt.Fprintf(g.out(), "Downloaded %d rates", res.Added)
+					fmt.Fprintf(g.out(), "Downloaded %s", count(res.Added, "rate", "rates"))
 					if len(res.Pairs) > 0 {
 						fmt.Fprintf(g.out(), " (%s)", strings.Join(res.Pairs, ", "))
 					}
@@ -183,6 +192,7 @@ func ratesCmd(g *globals) *cobra.Command {
 			})
 		},
 	}
+	fetch.Flags().StringVar(&in, "in", "", "download rates into this currency (default: your base currency)")
 	cmd.AddCommand(fetch)
 	return cmd
 }

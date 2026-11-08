@@ -45,18 +45,51 @@ func (q Q) FirstTransactionDate(ctx context.Context) (core.Date, error) {
 	return core.ParseDate(*d)
 }
 
-// LastPriceDate returns the newest date with a rate for a pair from one of the sources.
-func (q Q) LastPriceDate(ctx context.Context, base, quote core.Currency, sources ...core.PriceSource) (core.Date, error) {
-	args := []any{string(base), string(quote)}
-	for _, s := range sources {
-		args = append(args, string(s))
-	}
+// LastFetchedDate returns the newest date with a downloaded rate for a pair (not
+// a manual rate and not one implied by a transaction).
+func (q Q) LastFetchedDate(ctx context.Context, base, quote core.Currency) (core.Date, error) {
 	var d *string
-	err := q.q.QueryRowContext(ctx, "SELECT max(date) FROM prices WHERE base = ? AND quote = ? AND source IN ("+placeholders(len(sources))+")", args...).Scan(&d)
+	err := q.q.QueryRowContext(ctx, "SELECT max(date) FROM prices WHERE base = ? AND quote = ? AND source NOT IN (?, ?)",
+		string(base), string(quote), string(core.SourceManual), string(core.SourceTx)).Scan(&d)
 	if err != nil || d == nil {
 		return core.Date{}, err
 	}
 	return core.ParseDate(*d)
+}
+
+// UserRateSources returns the TOML of the user's rate sources by name.
+func (q Q) UserRateSources(ctx context.Context) (map[string]string, error) {
+	rows, err := q.q.QueryContext(ctx, "SELECT name, toml FROM rate_sources")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[string]string{}
+	for rows.Next() {
+		var n, t string
+		if err := rows.Scan(&n, &t); err != nil {
+			return nil, err
+		}
+		out[n] = t
+	}
+	return out, rows.Err()
+}
+
+// UpsertRateSource stores a user rate source.
+func (q Q) UpsertRateSource(ctx context.Context, name, text string) error {
+	_, err := q.q.ExecContext(ctx, `INSERT INTO rate_sources (name, toml) VALUES (?, ?)
+		ON CONFLICT(name) DO UPDATE SET toml = excluded.toml, updated_at = strftime('%Y-%m-%dT%H:%M:%SZ','now')`, name, text)
+	return err
+}
+
+// DeleteRateSource removes a user rate source and reports whether it existed.
+func (q Q) DeleteRateSource(ctx context.Context, name string) (bool, error) {
+	res, err := q.q.ExecContext(ctx, "DELETE FROM rate_sources WHERE name = ?", name)
+	if err != nil {
+		return false, err
+	}
+	n, err := res.RowsAffected()
+	return n > 0, err
 }
 
 // Prices returns all stored rates.

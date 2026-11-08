@@ -43,15 +43,6 @@ func (a *App) reportCurrency(ctx context.Context, in string) (core.Currency, err
 	return a.BaseCurrency(ctx)
 }
 
-// PriceIndex loads all stored exchange rates.
-func (a *App) PriceIndex(ctx context.Context) (*core.PriceIndex, error) {
-	prices, err := a.st.Prices(ctx)
-	if err != nil {
-		return nil, err
-	}
-	return core.NewPriceIndex(prices), nil
-}
-
 // Balances reports the balance of every open asset and liability account on a date,
 // converted at that date's rates (current valuation).
 func (a *App) Balances(ctx context.Context, p BalanceParams) (BalanceReport, error) {
@@ -69,7 +60,7 @@ func (a *App) Balances(ctx context.Context, p BalanceParams) (BalanceReport, err
 		return BalanceReport{}, err
 	}
 	var rep BalanceReport
-	err = a.withRates(ctx, func(ix *core.PriceIndex) error {
+	err = a.withRates(ctx, cur, func(ix *core.PriceIndex) error {
 		var err error
 		rep, err = balanceReport(tree, balances, ix, cur, date)
 		return err

@@ -28,7 +28,8 @@ core        → nothing in this module (pure: no I/O, no SQL, no time.Now)
 - Real accounts (assets, liabilities) have one currency; a posting to a real account must be in that currency. Group accounts (no currency) cannot receive postings. Categories (income, expenses) and equity accept any currency.
 - The account taxonomy is closed: an unknown name is an error with suggestions; nothing is created implicitly. Only `account add` / `category add` / `init` create accounts. Tags are the exception (open list).
 - No posting after an account's close date.
-- Exchange-rate lookup: latest rate on or before the date; source priority boi > ecb > manual > tx; inverse and cross rates (through ILS or USD) are allowed; a missing rate is an error, never 1:1.
+- Exchange-rate lookup: latest rate on or before the date; priority = rate_sources order > other downloaded > manual > tx; inverse and cross rates are allowed (base currency first as the pivot); a missing rate is an error, never 1:1.
+- No country, currency or rate source is hard-coded in Go. Rate sources and import profiles are TOML (built-ins in prices/sources and importers/profiles).
 - One user action = one DB transaction.
 
 ## Conventions

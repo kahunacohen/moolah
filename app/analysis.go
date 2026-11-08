@@ -87,7 +87,7 @@ func (a *App) NetWorth(ctx context.Context, p NetWorthParams) (NetWorthReport, e
 		}
 	}
 	var rep NetWorthReport
-	err = a.withRates(ctx, func(ix *core.PriceIndex) error {
+	err = a.withRates(ctx, cur, func(ix *core.PriceIndex) error {
 		rep = NetWorthReport{Currency: cur, Period: period}
 		start, err := balanceReport(tree, startBal, ix, cur, period.From.AddDays(-1))
 		if err != nil {
@@ -181,7 +181,7 @@ func (a *App) Income(ctx context.Context, p IncomeParams) (IncomeReport, error) 
 		return IncomeReport{}, err
 	}
 	var rep IncomeReport
-	err = a.withRates(ctx, func(ix *core.PriceIndex) error {
+	err = a.withRates(ctx, cur, func(ix *core.PriceIndex) error {
 		own := map[int64]decimal.Decimal{}
 		for _, t := range txs {
 			eff := t.Date

@@ -22,7 +22,7 @@ var Version = "dev"
 // App is one open book.
 type App struct {
 	Book       string                 // book name, or "" when opened with an explicit path
-	Fetchers   []prices.Fetcher       // exchange-rate sources; Bank of Israel then ECB when nil
+	Fetchers   []prices.Fetcher       // replaces the TOML rate sources (tests)
 	Joined     bool                   // created by joining a sync folder
 	Offline    bool                   // never use the network (also the offline setting)
 	Passphrase func() (string, error) // asked when a private key has a passphrase

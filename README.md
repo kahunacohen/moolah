@@ -286,16 +286,19 @@ For a USD account like a 401(k), reports in shekels show the market gain and the
 
 moolah needs daily exchange rates to convert to your base currency. It gets them from:
 
-1. **Bank of Israel** official representative rates (שער יציג), for all currencies against the shekel.
-2. **European Central Bank** reference rates, for other currency pairs.
-3. **Rates you enter yourself.**
-4. **Rates from your own transactions** (only when no other rate exists).
+1. **Rate sources**: public rates APIs, each described in a small TOML file. moolah ships with the European Central Bank (about 30 major currencies, any pair) and the Bank of Israel (against the shekel). You can add your own, for example your country's central bank. See [docs/rate-sources.md](docs/rate-sources.md).
+2. **Rates you enter yourself.**
+3. **Rates from your own transactions** (only when no other rate exists).
+
+For each currency in your book, moolah downloads its rate **into your base currency** from the first source that publishes it. Sources that publish against your base currency are tried first. Change the order with `moolah config set rate_sources name1,name2`. If no source publishes a pair directly, moolah downloads two rates through a shared currency and combines them.
 
 moolah downloads missing rates **automatically** when a report needs them, and stores them. After that, everything works offline. Only currency codes and dates are sent, never your data.
 
 ```sh
+moolah source list                              # rate sources (* = used)
 moolah rates fetch                              # get all missing rates now
-moolah price add 2026-10-31 USD ILS 3.65        # enter a rate yourself
+moolah rates fetch --in EUR                     # rates into another currency
+moolah price add 2026-10-31 USD EUR 0.92        # enter a rate yourself
 moolah price import my-rates.csv                # columns: date,from,to,rate
 moolah --offline report networth                # never use the network
 ```
@@ -565,7 +568,7 @@ moolah config set base_currency USD
 | `base_currency` | set by `init --base` | currency for all reports |
 | `locale` | `en_US` | language, number format and text direction (`he_IL`, `en_US`) |
 | `offline` | `false` | `true`: never download exchange rates |
-| `rate_sources` | `boi,ecb` | order of exchange-rate sources |
+| `rate_sources` | automatic | exchange-rate sources to use, most trusted first, for example `ecb,boi`. Empty: all sources, those for your base currency first |
 | `backup_dir` | see above | default backup folder |
 | `backup_recipient` | none | age public key or SSH public key for backups; none means a passphrase is used |
 
@@ -582,12 +585,14 @@ Changing `base_currency` changes no stored data. Only reports change.
 
 ## Network access
 
-moolah connects to the network only to download exchange rates:
+moolah connects to the network only to download exchange rates, when a report needs a missing rate or when you run `moolah rates fetch`. It connects only to the addresses in the rate sources you use (`moolah source list`, `moolah source show <name>`), and it sends only currency codes and date ranges.
 
-| Host | When | Data sent |
-|---|---|---|
-| Bank of Israel (`edge.boi.gov.il`) | a report needs a missing rate, or `moolah rates fetch` | currency codes and date ranges |
-| Frankfurter / ECB (`api.frankfurter.dev`) | the same, for pairs that BoI does not publish | currency codes and date ranges |
+Built-in sources:
+
+| Source | Host |
+|---|---|
+| `ecb` | `api.frankfurter.dev` |
+| `boi` | `edge.boi.gov.il` |
 
 `moolah config set offline true` or `--offline` turns this off completely. Nothing else is sent: no telemetry, no update checks.
 

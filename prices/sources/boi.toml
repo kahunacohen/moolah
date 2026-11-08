@@ -1,0 +1,11 @@
+# Bank of Israel representative rates (שער יציג), against the Israeli shekel only.
+# The CSV gives ILS per 10^UNIT_MULT units (for example JPY per 100).
+name = "boi"
+description = "Bank of Israel representative rates (against ILS)"
+quote = "ILS"
+currencies = ["AUD", "CAD", "CHF", "DKK", "EGP", "EUR", "GBP", "JOD", "JPY", "LBP", "NOK", "SEK", "USD", "ZAR"]
+url = "https://edge.boi.gov.il/FusionEdgeServer/sdmx/v2/data/dataflow/BOI.STATISTICS/EXR/1.0/RER_{base}_ILS?startperiod={from}&endperiod={to}&format=csv"
+format = "csv"
+date = "TIME_PERIOD"
+rate = "OBS_VALUE"
+unit_power = "UNIT_MULT"

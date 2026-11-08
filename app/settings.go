@@ -22,7 +22,7 @@ const (
 )
 
 // SettingKeys lists the settings a user may change.
-var SettingKeys = []string{KeyBackupDir, KeyBackupRecipient, KeyBaseCurrency, KeyLocale, KeyOffline}
+var SettingKeys = []string{KeyBackupDir, KeyBackupRecipient, KeyBaseCurrency, KeyLocale, KeyOffline, KeyRateSources}
 
 var locales = []string{"en_US", "he_IL"}
 
@@ -51,6 +51,8 @@ func validateSetting(key, value string) error {
 			return fmt.Errorf("offline must be true or false")
 		}
 		return nil
+	case KeyRateSources:
+		return nil // checked against the existing sources in SetConfig
 	}
 	return fmt.Errorf("unknown setting %q: use one of %s", key, strings.Join(SettingKeys, ", "))
 }
@@ -101,6 +103,18 @@ func (a *App) SetConfig(ctx context.Context, key, value string) error {
 	}
 	if err := validateSetting(key, value); err != nil {
 		return err
+	}
+	if key == KeyRateSources {
+		all, err := a.loadSources(ctx)
+		if err != nil {
+			return err
+		}
+		for _, n := range splitList(value) {
+			if _, ok := all[n]; !ok {
+				return fmt.Errorf("there is no rate source %q. See: moolah source list", n)
+			}
+		}
+		value = strings.Join(splitList(value), ",")
 	}
 	return a.st.SetSetting(ctx, key, value)
 }

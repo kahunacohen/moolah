@@ -1,0 +1,11 @@
+# European Central Bank reference rates, through the free Frankfurter API.
+# Publishes any pair among the currencies below (Frankfurter computes cross rates).
+name = "ecb"
+description = "European Central Bank reference rates (via Frankfurter)"
+currencies = ["AUD", "BRL", "CAD", "CHF", "CNY", "CZK", "DKK", "EUR", "GBP", "HKD", "HUF", "IDR", "ILS", "INR", "ISK",
+  "JPY", "KRW", "MXN", "MYR", "NOK", "NZD", "PHP", "PLN", "RON", "SEK", "SGD", "THB", "TRY", "USD", "ZAR"]
+url = "https://api.frankfurter.dev/v1/{from}..{to}?from={base}&to={quote}"
+format = "json"
+rows = "rates"
+rows_keyed_by_date = true
+rate = "{quote}"
