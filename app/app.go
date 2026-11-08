@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"moolah/core"
+	"moolah/crypt"
 	"moolah/prices"
 	"moolah/store"
 )
@@ -148,6 +149,28 @@ func (a *App) preMigrateBackup(s *store.Store, from, to int) error {
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return err
 	}
-	name := fmt.Sprintf("pre-migrate-v%d-to-v%d-%s.db", from, to, a.now().UTC().Format("20060102T150405"))
-	return s.VacuumInto(context.Background(), filepath.Join(dir, name))
+	ctx := context.Background()
+	name := filepath.Join(dir, fmt.Sprintf("pre-migrate-v%d-to-v%d-%s.db", from, to, a.now().UTC().Format("20060102T150405")))
+	key, _, err := s.Setting(ctx, KeyBackupRecipient)
+	if err != nil {
+		return err
+	}
+	if key == "" {
+		// Opening a book cannot stop to ask for a passphrase, so without a key the copy stays plain.
+		return s.VacuumInto(ctx, name)
+	}
+	r, err := crypt.ParseRecipient(key)
+	if err != nil {
+		return err
+	}
+	tmp, err := os.MkdirTemp(filepath.Dir(s.Path()), ".copy-")
+	if err != nil {
+		return err
+	}
+	defer os.RemoveAll(tmp)
+	plain := filepath.Join(tmp, "copy.db")
+	if err := s.VacuumInto(ctx, plain); err != nil {
+		return err
+	}
+	return crypt.EncryptFile(plain, name+".age", r)
 }

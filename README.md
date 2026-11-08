@@ -695,9 +695,10 @@ moolah restore FILE --db /tmp/test.db           # restore to another file, to lo
 
 ## Upgrades and database migrations
 
-- Replace the binary. On the first run, moolah updates the database schema automatically if needed.
-- **Before migrating, moolah makes an automatic copy** of the book in the backup folder (`pre-migrate-v1-to-v2-<time>.db`). This copy is **not encrypted**; delete it when the new version works.
-- An older binary refuses to open a database from a newer version, with a clear error.
+- Replace the binary. On the first run, moolah updates the book's schema automatically if needed, in one transaction: if anything fails, the book stays as it was.
+- **Before the upgrade, moolah copies the book** to the backup folder (`pre-migrate-v1-to-v2-<time>.db.age`). The copy is encrypted with `backup_recipient`. A book without a backup key gets a **plain** copy (`.db`), because moolah cannot ask for a passphrase while opening a book; delete it when the new version works.
+- An older binary refuses to open a book from a newer version, with a clear error.
+- **With sync, upgrade all your computers.** After one computer upgrades, its next change uploads data in the new format. A computer with the older moolah then stops with "Upgrade moolah on this computer" and does not change its local data.
 - `moolah --version` shows the binary version.
 
 ## Scheduled tasks

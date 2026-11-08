@@ -7,8 +7,17 @@ import (
 	"strings"
 )
 
-// migrations[i] upgrades the schema from version i to i+1. Never edit a released
-// migration; add a new one.
+// migrations[i] upgrades the schema from version i to i+1. All pending migrations
+// run in one transaction when a book is opened (see migrate).
+//
+// Rules:
+//   - Never edit or reorder a released migration; add a new one at the end.
+//   - Foreign keys are on and cannot be turned off inside the transaction, so
+//     DROP TABLE on a table that others reference (accounts, transactions, tags,
+//     import_batches) runs their ON DELETE actions and deletes rows. Rebuild such a
+//     table only after changing migrate to turn foreign keys off first.
+//   - Rebuilding a table drops its indexes and change-counter triggers; create them again.
+//   - A new table needs rows in the upgrade test data (migrate_test.go).
 var migrations = []string{
 	`
 CREATE TABLE meta (
@@ -213,9 +222,23 @@ func (s *Store) migrate(before func(s *Store, from, to int) error) error {
 		}
 	}
 	return s.InTx(ctx, func(tx *Tx) error {
+		var seq string
+		var hasSeq bool
+		if cur > 0 {
+			if seq, hasSeq, err = tx.Meta(ctx, "change_seq"); err != nil {
+				return err
+			}
+		}
 		for v := cur; v < SchemaVersion; v++ {
 			if _, err := tx.q.ExecContext(ctx, migrations[v]); err != nil {
 				return fmt.Errorf("migrate schema to version %d: %w", v+1, err)
+			}
+		}
+		// An upgrade is not a change by the user: counting it would make sync see
+		// unsent changes, and a conflict with the other computer, after every upgrade.
+		if hasSeq {
+			if err := tx.SetMeta(ctx, "change_seq", seq); err != nil {
+				return err
 			}
 		}
 		return tx.SetMeta(ctx, "schema_version", strconv.Itoa(SchemaVersion))

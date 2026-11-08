@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -263,6 +264,30 @@ func TestBackupRestore(t *testing.T) {
 		}
 		mustDo(t, func() error {
 			return Restore(RestoreParams{File: file, Target: target, Passphrase: func() (string, error) { return "correct horse", nil }})
+		})
+	})
+	// The copy made before a schema upgrade holds all the data, so it is encrypted
+	// like a backup whenever the book has a backup key.
+	t.Run("copy before an upgrade is encrypted", func(t *testing.T) {
+		a := newBook(t)
+		id, err := age.GenerateX25519Identity()
+		if err != nil {
+			t.Fatal(err)
+		}
+		mustDo(t, func() error { return a.SetConfig(ctx, KeyBackupRecipient, id.Recipient().String()) })
+		mustDo(t, func() error { return a.preMigrateBackup(a.st, 3, 4) })
+		dir, err := a.backupDir()
+		if err != nil {
+			t.Fatal(err)
+		}
+		files, err := filepath.Glob(filepath.Join(dir, "pre-migrate-*"))
+		if err != nil || len(files) != 1 || !strings.HasSuffix(files[0], ".db.age") {
+			t.Fatalf("files %v, %v", files, err)
+		}
+		keyFile := filepath.Join(t.TempDir(), "key.txt")
+		mustDo(t, func() error { return os.WriteFile(keyFile, []byte(id.String()+"\n"), 0o600) })
+		mustDo(t, func() error {
+			return Restore(RestoreParams{File: files[0], IdentityFile: keyFile, Target: filepath.Join(t.TempDir(), "r.db")})
 		})
 	})
 }

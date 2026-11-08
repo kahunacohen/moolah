@@ -5,11 +5,13 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
 
 	"moolah/core"
+	"moolah/store"
 	"moolah/syncdir"
 )
 
@@ -191,5 +193,40 @@ func TestSync(t *testing.T) {
 			}
 		}
 		a.command(t, nil) // a command still works next to them
+	})
+
+	// A computer with an older moolah never loads data it cannot read; it says to upgrade.
+	t.Run("snapshot from a newer moolah is refused", func(t *testing.T) {
+		a, b, dir := twoMachines(t)
+		plain, cleanup, err := a.app.plainCopy(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer cleanup()
+		st, err := store.Open(plain, store.OpenOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		mustDo(t, func() error { return st.SetMeta(ctx, "schema_version", strconv.Itoa(store.SchemaVersion+1)) })
+		mustDo(t, st.Close)
+		r, err := a.app.recipient(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		gen, _, err := a.app.st.Meta(ctx, "sync_gen")
+		if err != nil {
+			t.Fatal(err)
+		}
+		g, _ := strconv.ParseInt(gen, 10, 64)
+		if _, err := (syncdir.Folder{Dir: dir}).Publish(plain, g+1, g, "newer-0000", r); err != nil {
+			t.Fatal(err)
+		}
+		_, err = b.app.SyncBefore(ctx)
+		if !errors.Is(err, store.ErrNewerSchema) || !strings.Contains(err.Error(), "Upgrade moolah on this computer") {
+			t.Fatalf("got %v", err)
+		}
+		if got := netWorth(t, b.app); got != "1000" {
+			t.Fatalf("local data changed: %s", got)
+		}
 	})
 }

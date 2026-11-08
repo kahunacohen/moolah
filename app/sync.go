@@ -356,6 +356,16 @@ func (a *App) pull(ctx context.Context, c *SyncConfig, machine string) error {
 	return a.adopt(ctx, c, heads[0])
 }
 
+// newerSnapshotError explains a snapshot that a newer moolah wrote. The local book is
+// not changed, and every command stops until moolah is upgraded on this computer.
+func newerSnapshotError(err error, s syncdir.Snapshot) error {
+	if !errors.Is(err, store.ErrNewerSchema) {
+		return err
+	}
+	return fmt.Errorf("the newest data in the sync folder (from %s) was written by a newer version of moolah. "+
+		"Upgrade moolah on this computer; your local data was not changed: %w", s.Machine, err)
+}
+
 // adopt replaces the local book with a snapshot.
 func (a *App) adopt(ctx context.Context, c *SyncConfig, s syncdir.Snapshot) error {
 	ids, err := a.identities(c)
@@ -374,7 +384,7 @@ func (a *App) adopt(ctx context.Context, c *SyncConfig, s syncdir.Snapshot) erro
 	remoteID, err := readDBID(tmp)
 	if err != nil {
 		_ = os.Remove(tmp)
-		return err
+		return newerSnapshotError(err, s)
 	}
 	if remoteID != localID {
 		_ = os.Remove(tmp)
@@ -805,7 +815,7 @@ func Join(p JoinParams, paths Paths) (*App, error) {
 	a, err := Open(p.Path, p.Book, paths)
 	if err != nil {
 		_ = os.Remove(p.Path)
-		return nil, err
+		return nil, newerSnapshotError(err, heads[0])
 	}
 	a.Passphrase = p.Passphrase
 	a.Joined = true
