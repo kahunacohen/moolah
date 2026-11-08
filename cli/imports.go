@@ -229,7 +229,7 @@ func ruleCmd(g *globals) *cobra.Command {
 	add := &cobra.Command{
 		Use:     "add <pattern> <category>",
 		Short:   "Add a rule (a regular expression, not case-sensitive)",
-		Example: "  moolah rule add 'shufersal|שופרסל|rami levy' food:groceries\n  moolah rule add 'מקס|max it' liabilities:card:max    # card payment = transfer",
+		Example: "  moolah rule add 'supermarket|aldi|lidl' food:groceries\n  moolah rule add 'visa payment' liabilities:card:visa    # card payment = transfer",
 		Args:    cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			p.Pattern, p.Account = args[0], args[1]

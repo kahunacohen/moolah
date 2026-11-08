@@ -2,11 +2,7 @@
 
 A personal finance tool for the command line, with an optional browser UI that runs on your own computer.
 
-> **Status:** in development. This README describes the planned behavior.
-> **Works now:** books, accounts and categories, tags, `add`, `transfer`, `edit`, `delete`, `register`, `balance` (with `--in`), `value`, exchange rates (`price`, `rates fetch`, automatic download), `report networth`, `report income`, `config`, encrypted `backup`/`restore`, `check`, sync between computers (`sync`).
-> **Also works:** import (CSV, XLSX, HTML-as-XLS) with TOML profiles, duplicate detection, rules, `review`, transfer matching, `import undo`, `reconcile`.
-> **Also works:** the browser UI (`serve`), in any language that has a translation file (English and Hebrew included), with right-to-left support.
-> **Not built yet:** only one built-in import profile ships (`generic-csv`); profiles for specific banks will be added from real (anonymized) export files. Writing your own takes a few lines of TOML. Investment holdings and lots (levels B/C) are not planned for now.
+> **Status:** everything in this README works. Only one built-in import profile ships (`generic-csv`); for your bank, [write a profile](#adding-an-import-profile) in a few lines of TOML. Investment holdings and lots are not planned for now.
 
 moolah keeps track of your bank accounts, credit cards and retirement accounts in any currency, and reports everything in **one base currency that you choose** (for example euros or US dollars). Your data is one SQLite file on your computer. Nothing is sent anywhere, except requests for public exchange rates.
 
@@ -21,31 +17,32 @@ moolah keeps track of your bank accounts, credit cards and retirement accounts i
 6. [Recording transactions](#recording-transactions)
 7. [Foreign currencies](#foreign-currencies)
 8. [Importing bank and card files](#importing-bank-and-card-files)
-9. [Pension and retirement accounts](#pension-and-retirement-accounts)
-10. [Exchange rates](#exchange-rates)
-11. [Reports](#reports)
-12. [Reconciling with a statement](#reconciling-with-a-statement)
-13. [The browser UI](#the-browser-ui)
-14. [Languages and right-to-left text](#languages-and-right-to-left-text)
-15. [Backups](#backups)
-16. [Working on different machines](#working-on-different-machines)
-17. [Several sets of books](#several-sets-of-books)
-18. [Common errors](#common-errors)
+9. [Adding an import profile](#adding-an-import-profile)
+10. [Pension and retirement accounts](#pension-and-retirement-accounts)
+11. [Exchange rates](#exchange-rates)
+12. [Reports](#reports)
+13. [Reconciling with a statement](#reconciling-with-a-statement)
+14. [The browser UI](#the-browser-ui)
+15. [Languages and right-to-left text](#languages-and-right-to-left-text)
+16. [Backups](#backups)
+17. [Working on different machines](#working-on-different-machines)
+18. [Several sets of books](#several-sets-of-books)
+19. [Common errors](#common-errors)
 
 **Operations**
-19. [Requirements and building](#requirements-and-building)
-20. [Files and locations](#files-and-locations)
-21. [Settings](#settings)
-22. [Security model](#security-model)
-23. [Network access](#network-access)
-24. [Backup and restore in detail](#backup-and-restore-in-detail)
-25. [How sync works](#how-sync-works)
-26. [Upgrades and database migrations](#upgrades-and-database-migrations)
-27. [Scheduled tasks](#scheduled-tasks)
-28. [Data integrity and direct SQL access](#data-integrity-and-direct-sql-access)
-29. [Troubleshooting](#troubleshooting)
-30. [Development](#development)
-31. [License](#license)
+20. [Requirements and building](#requirements-and-building)
+21. [Files and locations](#files-and-locations)
+22. [Settings](#settings)
+23. [Security model](#security-model)
+24. [Network access](#network-access)
+25. [Backup and restore in detail](#backup-and-restore-in-detail)
+26. [How sync works](#how-sync-works)
+27. [Upgrades and database migrations](#upgrades-and-database-migrations)
+28. [Scheduled tasks](#scheduled-tasks)
+29. [Data integrity and direct SQL access](#data-integrity-and-direct-sql-access)
+30. [Troubleshooting](#troubleshooting)
+31. [Development](#development)
+32. [License](#license)
 
 ---
 
@@ -261,6 +258,38 @@ moolah import undo 17         # removes everything import 17 created
 
 **Your bank's format is not supported?** Write a small TOML profile for it. No programming or rebuild is needed. See [Adding an import profile](#adding-an-import-profile).
 
+## Adding an import profile
+
+A profile is a small TOML file. No code change and no rebuild are needed. Profiles are stored in the book, so backups and sync include them.
+
+1. Start from a similar profile: `moolah profile show generic-csv > my-bank.toml`.
+2. Change the name, header names, columns and date format to match your file. Example:
+   ```toml
+   name = "my-bank"
+   encoding = "windows-1252"     # only for files that are not UTF-8
+
+   [detect]
+   headers = ["Booking date", "Description", "Debit", "Credit"]
+
+   [table]
+   stop = "Total"
+
+   [columns]
+   date = "Booking date"
+   date_format = "02.01.2006"    # day.month.year
+   payee = "Description"
+   debit = "Debit"
+   credit = "Credit"
+   ```
+3. Save it in moolah: `moolah profile add my-bank.toml`. moolah checks it and shows any error.
+4. Test it without importing anything: `moolah import test ~/Downloads/export.xls --profile my-bank --account checking`. Check that the dates, amounts and signs are correct.
+5. Fix things with `moolah profile edit my-bank` (opens your `$EDITOR` and checks the profile when you save).
+6. Import as usual. moolah finds the profile automatically from then on, and remembers which account it belongs to.
+
+Other commands: `moolah profile list`, `moolah profile export my-bank > my-bank.toml` (to share it), `moolah profile remove my-bank`.
+
+[docs/profiles.md](docs/profiles.md) lists every key, with a card example (pending rows, foreign purchases, installments). If a file cannot be described with the existing keys, the engine needs a new generic option. That is a code change in `importers/`, with a test.
+
 ## Pension and retirement accounts
 
 For pension funds and retirement savings plans (401(k), IRA, and similar), you usually only know the total value from the statement. moolah tracks the value and calculates the gain.
@@ -385,7 +414,7 @@ moolah backup --to /media/usb/        # somewhere else
 moolah restore moolah-2026-11-04.db.age
 ```
 
-Backups are encrypted. You choose a passphrase (or an SSH key) the first time. **If you lose the passphrase, the backup cannot be opened.** See [Backup and restore in detail](#backup-and-restore-in-detail).
+Backups are encrypted with the key you chose in `moolah init`, or with a passphrase if you chose none. **If you lose the key or the passphrase, the backup cannot be opened.** See [Backup and restore in detail](#backup-and-restore-in-detail).
 
 ## Working on different machines
 
@@ -410,7 +439,7 @@ You can use moolah on several computers, for example a desktop at home and a lap
 $ moolah init
 Sync folder for your other computers (Enter to skip): ~/Dropbox/moolah
 Base currency (ISO code, for example USD, EUR, GBP) [EUR]:
-Language (en_US, he_IL) [en_US]: he_IL
+Language and number format (for example en_US, de_DE, he_IL) [en_US]: de_DE
 Encryption key for backups and sync: 'new' (create one), 'ssh' (~/.ssh/id_ed25519.pub), a public key, or 'none' (a passphrase each time) [new]:
 Created the encryption key ~/.config/moolah/age-key.txt. Keep a copy somewhere safe; copy it to your other computers.
 This book syncs through ~/Dropbox/moolah.
@@ -553,8 +582,10 @@ The browser UI files are embedded in the binary. There is no Node.js or frontend
 | SQLite side files while running | `moolah.db-wal`, `moolah.db-shm` next to the DB | — |
 | Backups | `~/.local/share/moolah/backups/` | `moolah config set backup_dir DIR`, or `moolah backup --to DIR` |
 | This computer's settings | `~/.config/moolah/config.toml` | `moolah config set`, or edit by hand |
+| moolah's own encryption key (private) | `~/.config/moolah/age-key.txt` | `sync init --identity FILE` to use another key |
+| This computer's name for sync | `~/.local/state/moolah/machine-id` | — |
 
-Order of precedence for the DB path: `--db` flag, then `MOOLAH_DB`, then the default. To keep separate sets of books (for example for a family member), use separate DB files.
+Which database a command uses: `--db PATH`, then `MOOLAH_DB`, then `--book NAME`, then `MOOLAH_BOOK`, then the current book (`moolah book use`), then `main`.
 
 ## Settings
 
@@ -647,11 +678,11 @@ moolah restore FILE --db /tmp/test.db           # restore to another file, to lo
 - Each computer keeps its own local database. The sync folder contains only encrypted, write-once files:
   ```
   ~/Dropbox/moolah/
-    snap-214-laptop.age      # full encrypted copy of the data, snapshot 214
-    snap-213-desktop.age
-    lock-laptop.json         # "in use on laptop", with a heartbeat
+    snap-0000000214-0000000213-laptop-3f2a.age    # snapshot 214, based on 213, from laptop
+    snap-0000000213-0000000212-desktop-91c0.age
+    lock-laptop-3f2a.json                         # "in use on laptop", with a heartbeat
   ```
-- Every snapshot records which snapshot it was based on. This is how moolah knows whether a newer snapshot continues your local data (load it) or both sides changed (conflict).
+- Every snapshot records which snapshot it was based on (the second number). This is how moolah knows whether a newer snapshot continues your local data (load it) or both sides changed (conflict).
 - A new file is written for every change and renamed into place only when complete, so a sync tool never sees a half-written or shared file.
 - moolah keeps the last 20 snapshots and one per day for 30 days, and deletes older ones. Each computer deletes only its own files.
 - Each book has a hidden ID. A computer refuses to load a snapshot of a different book.
@@ -665,9 +696,9 @@ moolah restore FILE --db /tmp/test.db           # restore to another file, to lo
 ## Upgrades and database migrations
 
 - Replace the binary. On the first run, moolah updates the database schema automatically if needed.
-- **Before migrating, moolah makes an automatic backup** (`backups/pre-migrate-<version>.db.age`).
+- **Before migrating, moolah makes an automatic copy** of the book in the backup folder (`pre-migrate-v1-to-v2-<time>.db`). This copy is **not encrypted**; delete it when the new version works.
 - An older binary refuses to open a database from a newer version, with a clear error.
-- `moolah --version` shows the binary version and the database schema version.
+- `moolah --version` shows the binary version.
 
 ## Scheduled tasks
 
@@ -675,11 +706,11 @@ None are required. Optional examples:
 
 ```sh
 # crontab -e
-0 9 * * *  moolah rates fetch --quiet                 # rates every morning
-0 3 * * 0  moolah backup --quiet                      # backup every Sunday (needs backup_recipient)
+0 9 * * *  moolah rates fetch >/dev/null            # rates every morning
+0 3 * * 0  moolah backup >/dev/null                 # backup every Sunday (needs backup_recipient)
 ```
 
-A systemd user timer works the same way. A scheduled backup needs `backup_recipient`, because it cannot ask for a passphrase.
+A systemd user timer works the same way. A scheduled backup needs `backup_recipient` (or `MOOLAH_PASSPHRASE`), because it cannot ask for a passphrase. Errors still go to stderr, so cron mails them to you.
 
 ## Data integrity and direct SQL access
 
@@ -692,7 +723,7 @@ checks that every transaction balances, every account reference is valid, there 
 The database is a normal SQLite file, so you can query it directly:
 
 ```sh
-sqlite3 -readonly ~/.local/share/moolah/moolah.db
+sqlite3 -readonly ~/.local/share/moolah/books/main.db
 ```
 
 Use read-only mode. Changing data with SQL skips moolah's rules. Make a backup first if you must.
@@ -703,7 +734,7 @@ Use read-only mode. Changing data with SQL skips moolah's rules. Make a backup f
 |---|---|
 | `database is locked` | Another long write is running (for example a big import). Wait and try again. If no moolah process is running, check for a stuck process with `pgrep moolah`. |
 | Browser shows "invalid token" | Open the URL that `moolah serve` printed, including `?token=`. |
-| Rates fail to download | Check the network, and run `moolah rates fetch -v` to see the request and the error. A rates API sometimes changes. Try it with `moolah source test <name> USD EUR`, fix the source with `moolah source edit <name>`, or enter rates with `moolah price add`. |
+| Rates fail to download | Check the network. Test one source with `moolah source test <name> USD EUR`: it shows the rates, or the error. A rates API sometimes changes; fix the source with `moolah source edit <name>`, or enter rates with `moolah price add`. |
 | Right-to-left text (Hebrew, Arabic) looks reversed in the terminal | A terminal limitation. Use `--format csv` or the browser UI. |
 | An import gave wrong amounts or dates | `moolah import undo <id>`, then report the problem with a sample file (personal details removed). |
 
@@ -725,39 +756,8 @@ web/          browser UI (Go templates + htmx), embedded in the binary
 - `make check` must pass before every commit.
 - Core rules have unit tests. Report output and import profiles have golden-file tests: `make golden` updates them after an intended change. Look at the diff before you commit.
 
-### Adding an import profile
+**To add a built-in import profile** (shipped in the binary): put the TOML in `importers/profiles/` with an anonymized sample file and a test. Remove personal details (names, account numbers, ID numbers) but keep the structure, headers and number formats exactly. Never commit a real bank export.
 
-A profile is a small TOML file. No code change and no rebuild are needed. Profiles are stored in the book, so backups and sync include them.
-
-1. Start from a similar profile: `moolah profile show generic-csv > my-bank.toml`.
-2. Change the name, header names, columns and date format to match your file. Example:
-   ```toml
-   name = "my-bank"
-   encoding = "windows-1252"     # only for files that are not UTF-8
-
-   [detect]
-   headers = ["Booking date", "Description", "Debit", "Credit"]
-
-   [table]
-   stop = "Total"
-
-   [columns]
-   date = "Booking date"
-   date_format = "02.01.2006"    # day.month.year
-   payee = "Description"
-   debit = "Debit"
-   credit = "Credit"
-   ```
-3. Save it in moolah: `moolah profile add my-bank.toml`. moolah checks it and shows any error.
-4. Test it without importing anything: `moolah import test ~/Downloads/export.xls --profile my-bank --account checking`. Check that the dates, amounts and signs are correct.
-5. Fix things with `moolah profile edit my-bank` (opens your `$EDITOR` and checks the profile when you save).
-6. Import as usual. moolah finds the profile automatically from then on, and remembers which account it belongs to.
-
-Other commands: `moolah profile list`, `moolah profile export my-bank > my-bank.toml` (to share it), `moolah profile remove my-bank`.
-
-[docs/profiles.md](docs/profiles.md) lists every key, with a card example (pending rows, foreign purchases, installments). If a file cannot be described with the existing keys, the engine needs a new generic option. That is a code change in `importers/`, with a test.
-
-**To add a built-in profile** (shipped in the binary): put the TOML in `importers/profiles/` with an anonymized sample file and a test. Remove personal details (names, account numbers, ID numbers) but keep the structure, headers and number formats exactly. Never commit a real bank export.
 
 ## License
 

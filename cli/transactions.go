@@ -62,9 +62,9 @@ func addCmd(g *globals) *cobra.Command {
 		Short: "Record a transaction (negative amount = money leaves the account)",
 		Long: "Record a transaction. The amount is in the account's currency; negative means money\n" +
 			"leaves the account. For a transaction with more lines, use --posting account=amount (repeat).",
-		Example: "  moolah add leumi -200 food:groceries --payee Shufersal\n" +
-			"  moolah add leumi 18500 salary\n" +
-			"  moolah add --payee Super-Pharm --posting leumi=-300 --posting health=180 --posting household=120",
+		Example: "  moolah add checking -200 food:groceries --payee Supermarket\n" +
+			"  moolah add checking 3500 salary\n" +
+			"  moolah add --payee Pharmacy --posting checking=-300 --posting health=180 --posting household=120",
 		ValidArgsFunction: g.completeAccounts(app.ScopeAny),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			info, err := f.info()
@@ -102,8 +102,8 @@ func transferCmd(g *globals) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "transfer <from> <to> <amount>",
 		Short: "Move money between your own accounts (also pays a credit card)",
-		Example: "  moolah transfer leumi card:max 3200\n" +
-			"  moolah transfer leumi card:chase 1530 --to-amount 420 --fee 15",
+		Example: "  moolah transfer checking card:visa 3200\n" +
+			"  moolah transfer checking card:chase 390 --to-amount 420 --fee 5",
 		Args:              cobra.ExactArgs(3),
 		ValidArgsFunction: g.completeAccounts(app.ScopeReal),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -262,7 +262,7 @@ func registerCmd(g *globals) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:               "register [account]",
 		Short:             "List transactions, for one account with a running balance",
-		Example:           "  moolah register leumi\n  moolah register --category food --from 2026-10-01",
+		Example:           "  moolah register checking\n  moolah register --category food --from 2026-10-01",
 		Args:              cobra.MaximumNArgs(1),
 		ValidArgsFunction: g.completeAccounts(app.ScopeAny),
 		RunE: func(cmd *cobra.Command, args []string) error {
