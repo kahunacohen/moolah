@@ -549,30 +549,58 @@ The browser UI files are embedded in the binary. There is no Node.js or frontend
 |---|---|---|
 | Books (one file per book, with all its data and settings) | `~/.local/share/moolah/books/<name>.db` | `--book NAME` / `MOOLAH_BOOK`, or `--db PATH` / `MOOLAH_DB` for any file |
 | SQLite side files while running | `moolah.db-wal`, `moolah.db-shm` next to the DB | — |
-| Backups | `~/.local/share/moolah/backups/` | `moolah backup --to DIR` |
+| Backups | `~/.local/share/moolah/backups/` | `moolah config set backup_dir DIR`, or `moolah backup --to DIR` |
+| This computer's settings | `~/.config/moolah/config.toml` | `moolah config set`, or edit by hand |
 
 Order of precedence for the DB path: `--db` flag, then `MOOLAH_DB`, then the default. To keep separate sets of books (for example for a family member), use separate DB files.
 
 ## Settings
 
-Settings are stored in the database, so a backup includes them.
+There is one rule: **everything about a book is stored in the book**, so it moves to your other computers through sync and is in every backup. Only settings that make sense on just one computer (paths, offline mode) are stored on the computer, in `~/.config/moolah/config.toml`.
+
+One command handles both. moolah knows where each setting belongs:
 
 ```sh
 moolah config list
 moolah config get base_currency
-moolah config set base_currency USD
+moolah config set base_currency EUR      # in the book (syncs)
+moolah config set offline true           # on this computer only
 ```
 
-| Setting | Default | Meaning |
-|---|---|---|
-| `base_currency` | set by `init --base` | currency for all reports |
-| `locale` | `en_US` | language, number format and text direction (`he_IL`, `en_US`) |
-| `offline` | `false` | `true`: never download exchange rates |
-| `rate_sources` | automatic | exchange-rate sources to use, most trusted first, for example `ecb,boi`. Empty: all sources, those for your base currency first |
-| `backup_dir` | see above | default backup folder |
-| `backup_recipient` | none | age public key or SSH public key for backups; none means a passphrase is used |
+```
+Setting           Value   Stored in
+backup_dir                this computer
+backup_recipient  age1…   book
+base_currency     EUR     book
+locale            de_DE   book
+offline           false   this computer
+rate_sources              book
+```
+
+| Setting | Stored in | Default | Meaning |
+|---|---|---|---|
+| `base_currency` | book | set by `init` | currency for all reports |
+| `locale` | book | from your system | language and number format, for example `en_US`, `de_DE`, `he_IL` |
+| `rate_sources` | book | automatic | exchange-rate sources to use, most trusted first, for example `ecb`. Empty: all sources, those for your base currency first |
+| `backup_recipient` | book | none | age or SSH **public** key that encrypts backups and sync snapshots; none means a passphrase is used |
+| `backup_dir` | this computer | `~/.local/share/moolah/backups` | backup folder |
+| `offline` | this computer | `false` | `true`: never download exchange rates |
 
 Changing `base_currency` changes no stored data. Only reports change.
+
+**This computer's file** (`~/.config/moolah/config.toml`) also holds the current book and each book's sync folder and key path. You can edit it by hand. moolah checks it at start, and an unknown key is an error that names the file and the key. `moolah config set` rewrites the file, so comments you add are not kept:
+
+```toml
+backup_dir = "/home/you/backups/moolah"
+current_book = "main"
+offline = false
+
+[books.3f2a9c…]                      # a book's ID
+sync_dir = "/home/you/Dropbox/moolah"
+identity = "/home/you/.config/moolah/age-key.txt"
+```
+
+Your import profiles, rate sources, rules and categories are **book** data: they are stored in the book's database. A `.toml` file you give to `moolah profile add` or `moolah source add` is only read once, to import it. `moolah profile show` and `moolah source show` print it again from the book.
 
 ## Security model
 
@@ -628,7 +656,7 @@ moolah restore FILE --db /tmp/test.db           # restore to another file, to lo
 - The computer's name comes from `~/.local/state/moolah/machine-id`. It is not inside the synced data.
 - Every computer needs the private key that matches `backup_recipient`, to decrypt snapshots.
 - `--no-sync` skips sync for one command. `moolah sync off` stops sync on this computer.
-- The sync folder and key path are set **per computer** (they can differ between computers), in `~/.config/moolah/sync/<book-id>.json`. They are not book settings.
+- The sync folder and key path are set **per computer** (they can differ between computers), in `~/.config/moolah/config.toml` under `[books.<book-id>]`. They are not book settings.
 - The decryption key is `~/.config/moolah/age-key.txt` if it exists, else `~/.ssh/id_ed25519`. Use `sync init --identity <file>` for another key.
 - `moolah serve` checks the sync folder every 30 seconds.
 

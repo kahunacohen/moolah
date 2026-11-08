@@ -14,7 +14,7 @@ import (
 
 // Setting keys for exchange rates.
 const (
-	KeyOffline     = "offline"      // true: never use the network
+	KeyOffline     = "offline"      // true: never use the network (this computer only)
 	KeyRateSources = "rate_sources" // comma-separated source names, most trusted first
 )
 
@@ -158,8 +158,8 @@ func (a *App) offline(ctx context.Context) (bool, error) {
 	if a.Offline {
 		return true, nil
 	}
-	v, _, err := a.st.Setting(ctx, KeyOffline)
-	return v == "true", err
+	c, err := a.Paths.LoadConfig()
+	return c.Offline, err
 }
 
 // FetchResult reports what FetchRates downloaded.

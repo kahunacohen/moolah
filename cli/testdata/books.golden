@@ -31,3 +31,21 @@ $ moolah book use nobody
 error: book "nobody" does not exist. Create it with: moolah book add nobody
 [exit 1]
 
+$ moolah config set offline true
+Set offline.
+
+$ moolah config set backup_dir relative/path
+error: backup_dir must be an absolute path
+[exit 1]
+
+$ moolah config list
+Setting           Value  Stored in
+backup_dir               this computer
+backup_recipient         book
+base_currency     ILS    book
+locale            en_US  book
+offline           true   this computer
+rate_sources             book
+
+"book" settings sync with your other computers; "this computer" settings are in $TMP/config/config.toml.
+

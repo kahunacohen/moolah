@@ -115,7 +115,7 @@ func readPriceCSV(r io.Reader) ([]app.PriceParams, error) {
 }
 
 func configCmd(g *globals) *cobra.Command {
-	cmd := &cobra.Command{Use: "config", Short: "Book settings (stored in the book, so backups include them)"}
+	cmd := &cobra.Command{Use: "config", Short: "Settings: most are stored in the book; paths and offline mode only on this computer"}
 	get := &cobra.Command{
 		Use: "get <key>", Short: "Show a setting", Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -150,17 +150,21 @@ func configCmd(g *globals) *cobra.Command {
 				if err != nil {
 					return err
 				}
-				t := &table{headers: []string{"Setting", "Value"}}
-				js := map[string]string{}
+				t := &table{headers: []string{"Setting", "Value", "Stored in"}}
 				for _, p := range kv {
-					v := p[1]
-					if len(v) > 60 {
-						v = v[:57] + "..."
+					v := p.Value
+					if len(v) > 50 {
+						v = v[:47] + "..."
 					}
-					t.add(p[0], v)
-					js[p[0]] = p[1]
+					t.add(p.Key, v, string(p.Place))
 				}
-				return g.render(t, js)
+				if err := g.render(t, kv); err != nil {
+					return err
+				}
+				if g.format == "table" {
+					fmt.Fprintf(g.out(), "\n\"book\" settings sync with your other computers; \"this computer\" settings are in %s.\n", g.env.Paths.ConfigFile())
+				}
+				return nil
 			})
 		},
 	}

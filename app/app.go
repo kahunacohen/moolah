@@ -45,6 +45,10 @@ func Open(path, book string, paths Paths) (*App, error) {
 		return nil, err
 	}
 	a.st = st
+	if err := a.moveComputerSettings(context.Background()); err != nil {
+		_ = st.Close()
+		return nil, err
+	}
 	return a, nil
 }
 
@@ -64,9 +68,11 @@ func Create(p InitParams, book string, paths Paths) (*App, error) {
 	if p.Locale == "" {
 		p.Locale = "en_US"
 	}
-	if err := validateSetting(KeyLocale, p.Locale); err != nil {
+	locale, err := NormalizeLocale(p.Locale)
+	if err != nil {
 		return nil, err
 	}
+	p.Locale = locale
 	if p.BackupRecipient != "" {
 		if err := validateSetting(KeyBackupRecipient, p.BackupRecipient); err != nil {
 			return nil, err
@@ -135,7 +141,7 @@ func (a *App) BaseCurrency(ctx context.Context) (core.Currency, error) {
 }
 
 func (a *App) preMigrateBackup(s *store.Store, from, to int) error {
-	dir, err := a.backupDir(context.Background(), s)
+	dir, err := a.backupDir()
 	if err != nil {
 		return err
 	}

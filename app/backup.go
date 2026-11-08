@@ -52,7 +52,7 @@ func (a *App) Backup(ctx context.Context, p BackupParams) (string, error) {
 	}
 	dir := p.Dir
 	if dir == "" {
-		if dir, err = a.backupDir(ctx, a.st); err != nil {
+		if dir, err = a.backupDir(); err != nil {
 			return "", err
 		}
 	}

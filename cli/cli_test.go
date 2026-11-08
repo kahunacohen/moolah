@@ -165,6 +165,9 @@ func TestScenarios(t *testing.T) {
 		s.run("book use main")
 		s.run("book list")
 		s.run("book use nobody")
+		s.run("config set offline true")
+		s.run("config set backup_dir relative/path")
+		s.run("config list")
 		s.golden("books")
 	})
 }

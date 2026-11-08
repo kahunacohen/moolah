@@ -6,11 +6,13 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
+
+	"golang.org/x/text/language"
 
 	"moolah/core"
 	"moolah/crypt"
-	"moolah/store"
 )
 
 // Setting keys.
@@ -21,10 +23,48 @@ const (
 	KeyLocale          = "locale"
 )
 
-// SettingKeys lists the settings a user may change.
-var SettingKeys = []string{KeyBackupDir, KeyBackupRecipient, KeyBaseCurrency, KeyLocale, KeyOffline, KeyRateSources}
+// SettingPlace tells where a setting is stored.
+type SettingPlace string
 
-var locales = []string{"en_US", "he_IL"}
+// Setting places.
+const (
+	PlaceBook     SettingPlace = "book"          // in the book's database: synced and backed up
+	PlaceComputer SettingPlace = "this computer" // in config.toml: never synced
+)
+
+var settingPlaces = map[string]SettingPlace{
+	KeyBackupDir:       PlaceComputer,
+	KeyBackupRecipient: PlaceBook,
+	KeyBaseCurrency:    PlaceBook,
+	KeyLocale:          PlaceBook,
+	KeyOffline:         PlaceComputer,
+	KeyRateSources:     PlaceBook,
+}
+
+// SettingKeys lists the settings a user may change, sorted.
+var SettingKeys = func() []string {
+	keys := make([]string, 0, len(settingPlaces))
+	for k := range settingPlaces {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return keys
+}()
+
+// NormalizeLocale checks a locale such as "de_DE", "he-IL" or "fr" and returns it
+// as language_REGION (or just the language).
+func NormalizeLocale(s string) (string, error) {
+	tag, err := language.Parse(strings.ReplaceAll(strings.TrimSpace(s), "_", "-"))
+	if err != nil || s == "" {
+		return "", fmt.Errorf("unknown locale %q: use a language and region such as en_US, de_DE or he_IL", s)
+	}
+	base, _ := tag.Base()
+	out := base.String()
+	if region, conf := tag.Region(); conf == language.Exact {
+		out += "_" + region.String()
+	}
+	return out, nil
+}
 
 func validateSetting(key, value string) error {
 	switch key {
@@ -32,14 +72,10 @@ func validateSetting(key, value string) error {
 		_, err := core.ParseCurrency(value)
 		return err
 	case KeyLocale:
-		for _, l := range locales {
-			if value == l {
-				return nil
-			}
-		}
-		return fmt.Errorf("unknown locale %q: use one of %s", value, strings.Join(locales, ", "))
+		_, err := NormalizeLocale(value)
+		return err
 	case KeyBackupDir:
-		if !filepath.IsAbs(value) {
+		if !filepath.IsAbs(expandHome(value)) {
 			return fmt.Errorf("backup_dir must be an absolute path")
 		}
 		return nil
@@ -57,54 +93,72 @@ func validateSetting(key, value string) error {
 	return fmt.Errorf("unknown setting %q: use one of %s", key, strings.Join(SettingKeys, ", "))
 }
 
-// Config returns one setting.
+// Config returns one setting, from the book or from this computer.
 func (a *App) Config(ctx context.Context, key string) (string, error) {
 	if err := knownKey(key); err != nil {
 		return "", err
+	}
+	if settingPlaces[key] == PlaceComputer {
+		c, err := a.Paths.LoadConfig()
+		if err != nil {
+			return "", err
+		}
+		switch key {
+		case KeyBackupDir:
+			return c.BackupDir, nil
+		case KeyOffline:
+			return strconv.FormatBool(c.Offline), nil
+		}
 	}
 	v, _, err := a.st.Setting(ctx, key)
 	return v, err
 }
 
+// SettingView is one setting for display.
+type SettingView struct {
+	Key   string       `json:"key"`
+	Place SettingPlace `json:"stored_in"`
+	Value string       `json:"value"`
+}
+
 // ConfigList returns all settings, including unset ones with an empty value.
-func (a *App) ConfigList(ctx context.Context) ([][2]string, error) {
-	all, err := a.st.Settings(ctx)
-	if err != nil {
-		return nil, err
-	}
-	keys := append([]string(nil), SettingKeys...)
-	sort.Strings(keys)
-	out := make([][2]string, 0, len(keys))
-	for _, k := range keys {
-		out = append(out, [2]string{k, all[k]})
+func (a *App) ConfigList(ctx context.Context) ([]SettingView, error) {
+	out := make([]SettingView, 0, len(SettingKeys))
+	for _, k := range SettingKeys {
+		v, err := a.Config(ctx, k)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, SettingView{Key: k, Place: settingPlaces[k], Value: v})
 	}
 	return out, nil
 }
 
-// SetConfig validates and changes one setting. An empty value removes it
-// (not allowed for base_currency and locale).
+// SetConfig validates and changes one setting, in the book or on this computer.
+// An empty value removes it (not allowed for base_currency and locale).
 func (a *App) SetConfig(ctx context.Context, key, value string) error {
 	if err := knownKey(key); err != nil {
 		return err
 	}
 	value = strings.TrimSpace(value)
-	if value == "" {
-		if key == KeyBaseCurrency || key == KeyLocale {
-			return fmt.Errorf("%s cannot be empty", key)
-		}
-		return a.st.DeleteSetting(ctx, key)
-	}
-	if key == KeyBaseCurrency {
-		c, err := core.ParseCurrency(value)
-		if err != nil {
+	if value != "" {
+		if err := validateSetting(key, value); err != nil {
 			return err
 		}
+	}
+	switch key {
+	case KeyBaseCurrency:
+		if value == "" {
+			return fmt.Errorf("%s cannot be empty", key)
+		}
+		c, _ := core.ParseCurrency(value)
 		value = string(c)
-	}
-	if err := validateSetting(key, value); err != nil {
-		return err
-	}
-	if key == KeyRateSources {
+	case KeyLocale:
+		if value == "" {
+			return fmt.Errorf("%s cannot be empty", key)
+		}
+		value, _ = NormalizeLocale(value)
+	case KeyRateSources:
 		all, err := a.loadSources(ctx)
 		if err != nil {
 			return err
@@ -116,25 +170,38 @@ func (a *App) SetConfig(ctx context.Context, key, value string) error {
 		}
 		value = strings.Join(splitList(value), ",")
 	}
+	if settingPlaces[key] == PlaceComputer {
+		return a.Paths.UpdateConfig(func(c *ComputerConfig) error {
+			switch key {
+			case KeyBackupDir:
+				c.BackupDir = value
+			case KeyOffline:
+				c.Offline = value == "true"
+			}
+			return nil
+		})
+	}
+	if value == "" {
+		return a.st.DeleteSetting(ctx, key)
+	}
 	return a.st.SetSetting(ctx, key, value)
 }
 
 func knownKey(key string) error {
-	for _, k := range SettingKeys {
-		if k == key {
-			return nil
-		}
+	if _, ok := settingPlaces[key]; !ok {
+		return fmt.Errorf("unknown setting %q: use one of %s", key, strings.Join(SettingKeys, ", "))
 	}
-	return fmt.Errorf("unknown setting %q: use one of %s", key, strings.Join(SettingKeys, ", "))
+	return nil
 }
 
-func (a *App) backupDir(ctx context.Context, s *store.Store) (string, error) {
-	v, ok, err := s.Setting(ctx, KeyBackupDir)
+// backupDir is this computer's backup folder.
+func (a *App) backupDir() (string, error) {
+	c, err := a.Paths.LoadConfig()
 	if err != nil {
 		return "", err
 	}
-	if ok {
-		return v, nil
+	if c.BackupDir != "" {
+		return expandHome(c.BackupDir), nil
 	}
 	return a.Paths.DefaultBackupDir(), nil
 }

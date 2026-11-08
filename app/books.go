@@ -61,22 +61,16 @@ func (p Paths) BookPath(name string) string { return filepath.Join(p.BooksDir(),
 // DefaultBackupDir is the default backup folder.
 func (p Paths) DefaultBackupDir() string { return filepath.Join(p.DataDir, "backups") }
 
-func (p Paths) currentBookFile() string { return filepath.Join(p.ConfigDir, "current-book") }
-
 // CurrentBook returns the book set with "moolah book use", or "main".
 func (p Paths) CurrentBook() (string, error) {
-	b, err := os.ReadFile(p.currentBookFile())
-	if errors.Is(err, os.ErrNotExist) {
-		return DefaultBook, nil
-	}
+	c, err := p.LoadConfig()
 	if err != nil {
 		return "", err
 	}
-	name := strings.TrimSpace(string(b))
-	if err := ValidateBookName(name); err != nil {
-		return "", fmt.Errorf("%s: %w", p.currentBookFile(), err)
+	if c.CurrentBook == "" {
+		return DefaultBook, nil
 	}
-	return name, nil
+	return c.CurrentBook, nil
 }
 
 // SetCurrentBook makes a book the current one.
@@ -84,10 +78,10 @@ func (p Paths) SetCurrentBook(name string) error {
 	if err := ValidateBookName(name); err != nil {
 		return err
 	}
-	if err := os.MkdirAll(p.ConfigDir, 0o700); err != nil {
-		return err
-	}
-	return os.WriteFile(p.currentBookFile(), []byte(name+"\n"), 0o600)
+	return p.UpdateConfig(func(c *ComputerConfig) error {
+		c.CurrentBook = name
+		return nil
+	})
 }
 
 // BookExists reports whether a named book has a file.

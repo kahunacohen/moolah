@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -31,11 +30,11 @@ import (
 
 const defaultSyncKeep = 20
 
-// SyncConfig is the per-computer sync setup of one book. It is stored outside the
-// book, because paths and keys differ between computers.
+// SyncConfig is the sync setup of one book on this computer. It is stored in this
+// computer's config.toml, not in the book, because paths and keys differ between computers.
 type SyncConfig struct {
-	Dir      string `json:"dir"`
-	Identity string `json:"identity,omitempty"` // private key file; the default key when empty
+	Dir      string
+	Identity string // private key file; the default key when empty
 }
 
 // SyncConflictError means two computers changed the book independently.
@@ -97,10 +96,6 @@ func (p Paths) MachineID() (string, error) {
 	return id, os.WriteFile(file, []byte(id+"\n"), 0o600)
 }
 
-func (p Paths) syncConfigFile(dbID string) string {
-	return filepath.Join(p.ConfigDir, "sync", dbID+".json")
-}
-
 // KeyFile is where "moolah sync keygen" writes the age private key.
 func (p Paths) KeyFile() string { return filepath.Join(p.ConfigDir, crypt.KeyFileName) }
 
@@ -132,41 +127,33 @@ func (a *App) SyncConfig(ctx context.Context) (*SyncConfig, error) {
 	if err != nil {
 		return nil, err
 	}
-	b, err := os.ReadFile(a.Paths.syncConfigFile(id))
-	if errors.Is(err, os.ErrNotExist) {
-		return nil, nil
-	}
+	c, err := a.Paths.LoadConfig()
 	if err != nil {
 		return nil, err
 	}
-	var c SyncConfig
-	if err := json.Unmarshal(b, &c); err != nil {
-		return nil, fmt.Errorf("sync settings: %w", err)
+	b, ok := c.Books[id]
+	if !ok || b.SyncDir == "" {
+		return nil, nil
 	}
-	return &c, nil
+	return &SyncConfig{Dir: expandHome(b.SyncDir), Identity: expandHome(b.Identity)}, nil
 }
 
-func (a *App) writeSyncConfig(ctx context.Context, c *SyncConfig) error {
+func (a *App) writeSyncConfig(ctx context.Context, sc *SyncConfig) error {
 	id, err := a.dbID(ctx)
 	if err != nil {
 		return err
 	}
-	file := a.Paths.syncConfigFile(id)
-	if c == nil {
-		err := os.Remove(file)
-		if errors.Is(err, os.ErrNotExist) {
+	return a.Paths.UpdateConfig(func(c *ComputerConfig) error {
+		if sc == nil {
+			delete(c.Books, id)
 			return nil
 		}
-		return err
-	}
-	if err := os.MkdirAll(filepath.Dir(file), 0o700); err != nil {
-		return err
-	}
-	b, err := json.MarshalIndent(c, "", "  ")
-	if err != nil {
-		return err
-	}
-	return os.WriteFile(file, b, 0o600)
+		if c.Books == nil {
+			c.Books = map[string]BookSync{}
+		}
+		c.Books[id] = BookSync{Identity: sc.Identity, SyncDir: sc.Dir}
+		return nil
+	})
 }
 
 func (a *App) metaInt(ctx context.Context, key string) (int64, error) {
@@ -629,7 +616,7 @@ func (a *App) SyncResolve(ctx context.Context, keep string) (string, error) {
 		return "", err
 	}
 	heads := syncdir.Heads(snaps)
-	backupDir, err := a.backupDir(ctx, a.st)
+	backupDir, err := a.backupDir()
 	if err != nil {
 		return "", err
 	}
