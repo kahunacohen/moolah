@@ -114,6 +114,9 @@ func (g *globals) open() (*app.App, error) {
 	}
 	a.SetClock(g.env.Now)
 	a.Offline = g.offline || g.env.Offline
+	if loc, err := a.Config(context.Background(), app.KeyLocale); err == nil {
+		core.SetNumberStyle(app.NumberStyleFor(loc))
+	}
 	a.Passphrase = func() (string, error) { return g.in.passphrase(false) }
 	return a, nil
 }

@@ -60,6 +60,34 @@ func TestSettingPlaces(t *testing.T) {
 			t.Fatalf("got %v", err)
 		}
 	})
+	// Number separators come from the language: 1,234.5 in English, 1.234,5 in German.
+	t.Run("number style from locale", func(t *testing.T) {
+		if st := NumberStyleFor("de_DE"); st.Decimal != "," || st.Group != "." {
+			t.Fatalf("de_DE: %+v", st)
+		}
+		if st := NumberStyleFor("en_US"); st.Decimal != "." || st.Group != "," {
+			t.Fatalf("en_US: %+v", st)
+		}
+	})
+	// Right-to-left follows the language's script, so Arabic works like Hebrew.
+	t.Run("right to left by script", func(t *testing.T) {
+		for loc, want := range map[string]bool{"he_IL": true, "ar_EG": true, "fa": true, "en_US": false, "de": false} {
+			if IsRightToLeft(loc) != want {
+				t.Fatalf("%s: want %v", loc, want)
+			}
+		}
+	})
+	// init suggests the language and base currency from the system's locale variables.
+	t.Run("system defaults", func(t *testing.T) {
+		env := map[string]string{"LANG": "de_DE.UTF-8", "LC_MONETARY": "he_IL.UTF-8"}
+		loc, cur := SystemDefaults(func(k string) string { return env[k] })
+		if loc != "de_DE" || cur != "ILS" {
+			t.Fatalf("got %s %s", loc, cur)
+		}
+		if loc, cur := SystemDefaults(func(string) string { return "C" }); loc != "" || cur != "" {
+			t.Fatalf("C locale gave %s %s", loc, cur)
+		}
+	})
 	// Any language and region is accepted and written in one form.
 	t.Run("locale normalized", func(t *testing.T) {
 		for in, want := range map[string]string{"de-DE": "de_DE", "he_IL": "he_IL", "fr": "fr"} {

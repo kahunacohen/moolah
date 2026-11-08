@@ -62,16 +62,20 @@ func New(a *app.App, addr string, books int) (*Server, error) {
 	if s.csrf, err = randomHex(); err != nil {
 		return nil, err
 	}
-	for _, loc := range []string{"en_US", "he_IL"} {
-		b, err := i18nFS.ReadFile("i18n/" + loc + ".json")
+	files, err := fs.ReadDir(i18nFS, "i18n")
+	if err != nil {
+		return nil, err
+	}
+	for _, f := range files {
+		b, err := i18nFS.ReadFile("i18n/" + f.Name())
 		if err != nil {
 			return nil, err
 		}
 		m := map[string]string{}
 		if err := json.Unmarshal(b, &m); err != nil {
-			return nil, fmt.Errorf("i18n %s: %w", loc, err)
+			return nil, fmt.Errorf("i18n %s: %w", f.Name(), err)
 		}
-		s.tr[loc] = m
+		s.tr[strings.TrimSuffix(f.Name(), ".json")] = m
 	}
 	funcs := template.FuncMap{
 		"money": func(v decimal.Decimal, c core.Currency) string { return core.FormatNumber(v, c.Scale()) },
@@ -235,15 +239,31 @@ type page struct {
 	ReviewCount int
 	SyncMsg     string
 	Title       string
+	en          map[string]string
 	tr          map[string]string
 }
 
-// T translates a UI text key.
+// T translates a UI text key; English when the language has no translation for it.
 func (p page) T(key string) string {
 	if v, ok := p.tr[key]; ok {
 		return v
 	}
+	if v, ok := p.en[key]; ok {
+		return v
+	}
 	return key
+}
+
+// translation returns the texts for a locale: "pt_BR.json", else "pt.json", else English.
+func (s *Server) translation(locale string) map[string]string {
+	if m, ok := s.tr[locale]; ok {
+		return m
+	}
+	lang, _, _ := strings.Cut(locale, "_")
+	if m, ok := s.tr[lang]; ok {
+		return m
+	}
+	return s.tr["en"]
 }
 
 type reviewRow struct {
@@ -257,13 +277,12 @@ type reviewRow struct {
 func (s *Server) newPage(r *http.Request, nav, title string) page {
 	ctx := r.Context()
 	loc, _ := s.app.Config(ctx, app.KeyLocale)
-	if _, ok := s.tr[loc]; !ok {
-		loc = "en_US"
-	}
-	p := page{CSRF: s.csrf, Dir: "ltr", Lang: loc[:2], Nav: nav, SyncMsg: s.syncMsg, tr: s.tr[loc]}
-	if loc == "he_IL" {
+	p := page{CSRF: s.csrf, Dir: "ltr", Lang: strings.ReplaceAll(loc, "_", "-"), Nav: nav, SyncMsg: s.syncMsg,
+		tr: s.translation(loc), en: s.tr["en"]}
+	if app.IsRightToLeft(loc) {
 		p.Dir = "rtl"
 	}
+	core.SetNumberStyle(app.NumberStyleFor(loc))
 	p.Title = p.T(title)
 	if s.books > 1 {
 		p.Book = s.app.Book

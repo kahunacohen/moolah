@@ -1,6 +1,7 @@
 # moolah design
 
 > **Implementation notes (where the build differs from the plan below):**
+> - **moolah is not tied to a country.** The plan below was written with an Israeli user in mind, so its examples use shekels, Israeli banks and Hebrew. In the build, no country, currency, bank or rate source is hard-coded: rate sources and import profiles are TOML data, locales come from CLDR, and `init` takes its defaults from the system locale.
 > - Import profiles use flat `[columns]` keys (`amount`, `negate`, `debit`, `credit`, …) instead of inline tables. Reference: `docs/profiles.md`.
 > - Every imported row becomes a transaction at once: in its rule's category, or in `expenses:uncategorized`. `review` then changes the category, so progress is always saved.
 > - Old binary `.xls` files are not supported (CSV, XLSX and HTML-as-XLS are).
@@ -8,7 +9,8 @@
 > - Settings: everything about a book is in its database. Only computer-specific settings (current book, sync folder and key path per book, `backup_dir`, `offline`) are in `~/.config/moolah/config.toml`. `moolah config` handles both and shows where each lives. `moolah sync keygen` creates an age key.
 > - Transfer matching links same-currency rows only. A cross-currency transfer is recorded with `moolah transfer … --to-amount`.
 > - Exchange-rate sources are TOML files (`docs/rate-sources.md`), not Go code. moolah fetches each currency into the report currency, from the first source that publishes the pair (or two legs through a pivot). The order comes from the `rate_sources` setting; `prices.source` has no CHECK constraint.
-> - Only one built-in import profile (`generic-csv`) ships until real, anonymized Israeli bank/card exports are available.
+> - Only one built-in import profile (`generic-csv`) ships until real, anonymized bank/card exports are available.
+> - Import guesses only ISO dates; other formats need `date_format`. Files that are not UTF-8 use the profile's `encoding` (default Windows-1252). The plan's "starter rules for Israeli card companies" were not built.
 
 ## Context
 A personal money manager for one user who is comfortable on the command line.

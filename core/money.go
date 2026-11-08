@@ -16,7 +16,7 @@ type Currency string
 func ParseCurrency(s string) (Currency, error) {
 	code := strings.ToUpper(strings.TrimSpace(s))
 	if _, err := currency.ParseISO(code); err != nil || len(code) != 3 {
-		return "", fmt.Errorf("unknown currency %q: use an ISO code such as ILS, USD or EUR", s)
+		return "", fmt.Errorf("unknown currency %q: use an ISO code such as USD, EUR or JPY", s)
 	}
 	return Currency(code), nil
 }
@@ -74,7 +74,20 @@ func (a Amount) String() string {
 	return FormatNumber(a.Value, a.Currency.Scale()) + " " + string(a.Currency)
 }
 
-// FormatNumber formats v with thousands separators and a fixed number of decimals.
+// NumberStyle is how a language writes numbers.
+type NumberStyle struct {
+	Decimal string // "." in English, "," in German
+	Group   string // "," in English, "." in German, a thin space in French
+}
+
+var numberStyle = NumberStyle{Decimal: ".", Group: ","}
+
+// SetNumberStyle sets how FormatNumber writes numbers in this process (from the
+// book's locale). The default is English: 1,234.56.
+func SetNumberStyle(s NumberStyle) { numberStyle = s }
+
+// FormatNumber formats v with thousands separators and a fixed number of decimals,
+// in the current number style.
 func FormatNumber(v decimal.Decimal, scale int32) string {
 	s := v.StringFixed(scale)
 	neg := strings.HasPrefix(s, "-")
@@ -83,13 +96,13 @@ func FormatNumber(v decimal.Decimal, scale int32) string {
 	var b strings.Builder
 	for i, r := range intPart {
 		if i > 0 && (len(intPart)-i)%3 == 0 {
-			b.WriteByte(',')
+			b.WriteString(numberStyle.Group)
 		}
 		b.WriteRune(r)
 	}
 	out := b.String()
 	if hasFrac {
-		out += "." + frac
+		out += numberStyle.Decimal + frac
 	}
 	if neg {
 		out = "-" + out

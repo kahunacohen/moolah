@@ -20,7 +20,7 @@ func priceCmd(g *globals) *cobra.Command {
 
 	add := &cobra.Command{
 		Use: "add <date> <from> <to> <rate>", Short: "Enter a rate: 1 <from> = <rate> <to>", Args: cobra.ExactArgs(4),
-		Example: "  moolah price add 2026-10-31 USD ILS 3.65",
+		Example: "  moolah price add 2026-10-31 USD EUR 0.92",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			d, err := core.ParseDate(args[0])
 			if err != nil {

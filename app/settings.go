@@ -9,7 +9,10 @@ import (
 	"strconv"
 	"strings"
 
+	xcurrency "golang.org/x/text/currency"
 	"golang.org/x/text/language"
+	"golang.org/x/text/message"
+	"golang.org/x/text/number"
 
 	"moolah/core"
 	"moolah/crypt"
@@ -50,6 +53,76 @@ var SettingKeys = func() []string {
 	sort.Strings(keys)
 	return keys
 }()
+
+// NumberStyleFor returns how numbers are written in a locale, from the Unicode
+// CLDR data: it formats 1234.5 and reads the separators back. English when unknown.
+func NumberStyleFor(locale string) core.NumberStyle {
+	def := core.NumberStyle{Decimal: ".", Group: ","}
+	tag, err := language.Parse(strings.ReplaceAll(locale, "_", "-"))
+	if err != nil {
+		return def
+	}
+	s := message.NewPrinter(tag).Sprint(number.Decimal(1234.5, number.Scale(1)))
+	i, j := strings.Index(s, "1"), strings.Index(s, "234")
+	k := strings.LastIndex(s, "5")
+	if i < 0 || j <= i || k <= j+3 {
+		return def // the language does not write Latin digits; keep English
+	}
+	return core.NumberStyle{Decimal: s[j+3 : k], Group: s[i+1 : j]}
+}
+
+// IsRightToLeft reports whether a locale's language is written right to left
+// (Hebrew, Arabic, Persian, Urdu, …), from its script.
+func IsRightToLeft(locale string) bool {
+	tag, err := language.Parse(strings.ReplaceAll(locale, "_", "-"))
+	if err != nil {
+		return false
+	}
+	script, _ := tag.Script()
+	switch script.String() {
+	case "Arab", "Hebr", "Thaa", "Syrc", "Nkoo", "Adlm", "Rohg", "Mand", "Samr":
+		return true
+	}
+	return false
+}
+
+// SystemDefaults suggests a locale and a base currency from the system's locale
+// variables (LC_ALL, LC_MONETARY, LANG), for example de_DE.UTF-8 → de_DE and EUR.
+// Empty values mean the system gives no usable hint.
+func SystemDefaults(getenv func(string) string) (locale string, currency core.Currency) {
+	clean := func(v string) string {
+		v, _, _ = strings.Cut(v, ".")
+		v, _, _ = strings.Cut(v, "@")
+		if v == "C" || v == "POSIX" {
+			return ""
+		}
+		return v
+	}
+	for _, k := range []string{"LC_ALL", "LANG"} {
+		if v := clean(getenv(k)); v != "" {
+			if l, err := NormalizeLocale(v); err == nil {
+				locale = l
+				break
+			}
+		}
+	}
+	for _, k := range []string{"LC_ALL", "LC_MONETARY", "LANG"} {
+		tag, err := language.Parse(strings.ReplaceAll(clean(getenv(k)), "_", "-"))
+		if err != nil {
+			continue
+		}
+		region, conf := tag.Region()
+		if conf != language.Exact {
+			continue
+		}
+		if unit, ok := xcurrency.FromRegion(region); ok {
+			if c, err := core.ParseCurrency(unit.String()); err == nil {
+				return locale, c
+			}
+		}
+	}
+	return locale, ""
+}
 
 // NormalizeLocale checks a locale such as "de_DE", "he-IL" or "fr" and returns it
 // as language_REGION (or just the language).

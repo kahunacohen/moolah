@@ -196,6 +196,18 @@ func TestPages(t *testing.T) {
 			t.Fatal("not right-to-left Hebrew")
 		}
 	})
+	// Numbers are written the way the book's language writes them.
+	t.Run("german number format", func(t *testing.T) {
+		s, a := newServer(t)
+		if err := a.SetConfig(context.Background(), app.KeyLocale, "de_DE"); err != nil {
+			t.Fatal(err)
+		}
+		w := s.do(t, req{path: "/?account=assets:bank:leumi", cookie: true})
+		if !strings.Contains(w.Body.String(), "1.000,00 ILS") {
+			t.Fatal("balance not in German format")
+		}
+		core.SetNumberStyle(app.NumberStyleFor("en_US"))
+	})
 	// Review sets the category of one row and answers with the updated row for htmx.
 	t.Run("review row", func(t *testing.T) {
 		s, a := newServer(t)

@@ -1,5 +1,5 @@
 // Package importers turns bank and card export files into normalized rows. Readers
-// handle file formats (CSV in any common encoding, XLSX, HTML tables saved as .xls);
+// handle file formats (CSV in any encoding, XLSX, HTML tables saved as .xls);
 // TOML profiles describe each bank's layout; rules choose categories. Nothing here
 // touches the database.
 package importers
@@ -15,31 +15,44 @@ import (
 
 	"github.com/xuri/excelize/v2"
 	"golang.org/x/net/html"
-	"golang.org/x/text/encoding/charmap"
+	"golang.org/x/text/encoding/htmlindex"
 	"golang.org/x/text/encoding/unicode"
 )
 
 // Grid is a table of cells, row by row. Cells are trimmed and free of bidi marks.
 type Grid [][]string
 
-// ReadFile reads a CSV, XLSX or HTML-as-XLS file into a grid (the first sheet or table).
-func ReadFile(path string) (Grid, error) {
+// DefaultEncoding decodes text files that are not UTF-8 when a profile names no
+// encoding. Windows-1252 covers most Western European languages.
+const DefaultEncoding = "windows-1252"
+
+// ValidEncoding checks an encoding name such as "windows-1255", "iso-8859-8" or "shift_jis".
+func ValidEncoding(name string) error {
+	if _, err := htmlindex.Get(name); err != nil {
+		return fmt.Errorf("unknown encoding %q: use a name such as utf-8, windows-1252, windows-1255, iso-8859-8 or shift_jis", name)
+	}
+	return nil
+}
+
+// ReadFile reads a CSV, XLSX or HTML-as-XLS file into a grid (the first sheet or
+// table). encoding is used for text files that are not UTF-8 (empty: DefaultEncoding).
+func ReadFile(path, encoding string) (Grid, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
-	return ReadBytes(data)
+	return ReadBytes(data, encoding)
 }
 
 // ReadBytes detects the format from the content, not the file name.
-func ReadBytes(data []byte) (Grid, error) {
+func ReadBytes(data []byte, encoding string) (Grid, error) {
 	switch {
 	case bytes.HasPrefix(data, []byte("PK\x03\x04")):
 		return readXLSX(data)
 	case bytes.HasPrefix(data, []byte{0xD0, 0xCF, 0x11, 0xE0}):
 		return nil, errors.New("this is an old binary Excel file (.xls), which moolah cannot read. Open it in a spreadsheet program and save it as .xlsx or .csv")
 	}
-	text, err := decodeText(data)
+	text, err := decodeText(data, encoding)
 	if err != nil {
 		return nil, err
 	}
@@ -50,9 +63,9 @@ func ReadBytes(data []byte) (Grid, error) {
 	return readCSV(text)
 }
 
-// decodeText returns UTF-8 text from UTF-8 (with or without BOM), UTF-16 with BOM,
-// or Windows-1255 (Hebrew) when the bytes are not valid UTF-8.
-func decodeText(data []byte) (string, error) {
+// decodeText returns UTF-8 text. UTF-8 (with or without BOM) and UTF-16 with a BOM
+// are recognized; other bytes are decoded with the given encoding.
+func decodeText(data []byte, encoding string) (string, error) {
 	switch {
 	case bytes.HasPrefix(data, []byte{0xEF, 0xBB, 0xBF}):
 		return string(data[3:]), nil
@@ -62,7 +75,14 @@ func decodeText(data []byte) (string, error) {
 	case utf8.Valid(data):
 		return string(data), nil
 	}
-	out, err := charmap.Windows1255.NewDecoder().Bytes(data)
+	if encoding == "" {
+		encoding = DefaultEncoding
+	}
+	enc, err := htmlindex.Get(encoding)
+	if err != nil {
+		return "", ValidEncoding(encoding)
+	}
+	out, err := enc.NewDecoder().Bytes(data)
 	return string(out), err
 }
 
@@ -106,7 +126,7 @@ func readXLSX(data []byte) (Grid, error) {
 	return clean(rows), nil
 }
 
-// readHTML reads the largest table of an HTML page (many Israeli banks export
+// readHTML reads the largest table of an HTML page (many banks export
 // HTML tables with an .xls name).
 func readHTML(text string) (Grid, error) {
 	doc, err := html.Parse(strings.NewReader(text))

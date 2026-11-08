@@ -216,7 +216,7 @@ func (a *App) AddPostings(ctx context.Context, p AddPostingsParams) (core.Transa
 			cur := l.cur
 			if cur == "" {
 				if len(realCurs) != 1 {
-					return fmt.Errorf("give a currency for %s, for example %s=120ILS", tree.Path(l.acct.ID), tree.Path(l.acct.ID))
+					return fmt.Errorf("give a currency for %s, for example %s=120EUR", tree.Path(l.acct.ID), tree.Path(l.acct.ID))
 				}
 				for c := range realCurs {
 					cur = c

@@ -35,6 +35,8 @@ core        → nothing in this module (pure: no I/O, no SQL, no time.Now)
 ## Conventions
 - Sign convention: amounts are from the account's point of view; negative = money leaves the account.
 - Dates are `YYYY-MM-DD` strings in storage; `core.Date` in code.
+- Numbers: users always type amounts with a dot for decimals; output uses the book locale's separators (`core.SetNumberStyle`, from CLDR). Machine formats (JSON, storage) never use locale separators.
+- Settings: book settings in the database; only computer-specific ones (paths, offline, current book, sync setup) in `~/.config/moolah/config.toml`. Each key's place is in `app/settings.go`.
 - Errors shown to users are plain English and say how to fix the problem.
 - Comments only when they say something the code cannot. Exported identifiers get doc comments. Test files: a one-line file comment, and one comment per `t.Run` stating the invariant.
 - Golden files: `make golden` updates them. Review the diff before committing.

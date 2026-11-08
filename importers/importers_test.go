@@ -13,9 +13,10 @@ import (
 	"moolah/core"
 )
 
-// bankProfile is a made-up Hebrew bank layout: debit/credit columns, a title row, a total row.
+// bankProfile is a made-up Hebrew bank layout in Windows-1255: debit/credit columns, a title row, a total row.
 const bankProfile = `
 name = "test-bank"
+encoding = "windows-1255"
 [detect]
 headers = ["תאריך", "תיאור", "חובה", "זכות"]
 [table]
@@ -64,14 +65,14 @@ func mustProfile(t *testing.T, text string) *Profile {
 }
 
 func TestReaders(t *testing.T) {
-	// Hebrew CSV files in Windows-1255 are decoded, and bidi marks are removed from cells.
+	// A file that is not UTF-8 is decoded with the profile's encoding, and bidi marks are removed from cells.
 	t.Run("windows-1255 csv", func(t *testing.T) {
 		text := "דוח תנועות\n\u200fתאריך,תיאור,חובה,זכות,אסמכתא\n03/10/2026,שופרסל,\"1,200.50\",,111\n05/10/2026,משכורת,,18500,112\nסה\"כ,,1200.50,18500,\n"
 		enc, err := charmap.Windows1255.NewEncoder().String(text)
 		if err != nil {
 			t.Fatal(err)
 		}
-		g, err := ReadBytes([]byte(enc))
+		g, err := ReadBytes([]byte(enc), "windows-1255")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -86,11 +87,22 @@ func TestReaders(t *testing.T) {
 			t.Fatalf("debit/credit gave %s and %s", rows[0].Amount, rows[1].Amount)
 		}
 	})
+	// Without an encoding, a file that is not UTF-8 is read as Windows-1252 (Western European).
+	t.Run("default encoding", func(t *testing.T) {
+		enc, err := charmap.Windows1252.NewEncoder().String("Date,Description,Amount\n2026-10-01,Café,-3\n")
+		if err != nil {
+			t.Fatal(err)
+		}
+		g, err := ReadBytes([]byte(enc), "")
+		if err != nil || g[1][1] != "Café" {
+			t.Fatalf("got %q, %v", g, err)
+		}
+	})
 	// Many banks save an HTML table with an .xls name; it is read like a sheet.
 	t.Run("html saved as xls", func(t *testing.T) {
 		page := `<html><body><table><tr><th>תאריך</th><th>תיאור</th><th>חובה</th><th>זכות</th></tr>
 			<tr><td>03/10/2026</td><td>רמי <b>לוי</b></td><td>85.00</td><td></td></tr></table></body></html>`
-		g, err := ReadBytes([]byte(page))
+		g, err := ReadBytes([]byte(page), "")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -120,7 +132,7 @@ func TestReaders(t *testing.T) {
 		if err := f.SaveAs(path); err != nil {
 			t.Fatal(err)
 		}
-		g, err := ReadFile(path)
+		g, err := ReadFile(path, "")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -142,7 +154,7 @@ func TestReaders(t *testing.T) {
 	})
 	// Old binary XLS cannot be read; the error says how to convert it.
 	t.Run("binary xls explains the fix", func(t *testing.T) {
-		_, err := ReadBytes([]byte{0xD0, 0xCF, 0x11, 0xE0, 0, 0})
+		_, err := ReadBytes([]byte{0xD0, 0xCF, 0x11, 0xE0, 0, 0}, "")
 		if err == nil || !strings.Contains(err.Error(), ".xlsx") {
 			t.Fatalf("got %v", err)
 		}
@@ -164,6 +176,15 @@ func TestProfiles(t *testing.T) {
 			t.Fatalf("got %d, %v", len(b), err)
 		}
 	})
+	// Without date_format only ISO dates are read: 03/10/2026 means different days in different countries.
+	t.Run("ambiguous date needs date_format", func(t *testing.T) {
+		if _, err := parseDate("03/10/2026", ""); err == nil || !strings.Contains(err.Error(), "date_format") {
+			t.Fatalf("got %v", err)
+		}
+		if d, err := parseDate("2026-10-03", ""); err != nil || d != core.MustDate("2026-10-03") {
+			t.Fatalf("got %v, %v", d, err)
+		}
+	})
 	// A row that cannot be read is reported with its line; the other rows still import.
 	t.Run("bad row reported with line", func(t *testing.T) {
 		g := Grid{{"תאריך", "תיאור", "חובה", "זכות"}, {"32/13/2026", "x", "1", ""}, {"01/10/2026", "y", "2", ""}}
@@ -181,14 +202,15 @@ func TestAmounts(t *testing.T) {
 		want  string
 	}{
 		{"1,234.56", false, "1234.56"},
-		{"₪ 1,234", false, "1234"},
+		{"€ 1,234", false, "1234"},
+		{"1'234.50 CHF", false, "1234.50"},
 		{"50.00-", false, "-50"},
 		{"(50.00)", false, "-50"},
 		{"1.234,56", true, "1234.56"},
 		{"", false, "0"},
 	}
 	for _, c := range cases {
-		// Bank number formats (symbols, trailing minus, parentheses, decimal comma) read as the same value.
+		// Bank number formats (currency symbols and codes, separators, trailing minus, parentheses, decimal comma) read as the same value.
 		t.Run(c.in, func(t *testing.T) {
 			got, err := ParseAmount(c.in, c.comma)
 			if err != nil || !got.Equal(decimal.RequireFromString(c.want)) {

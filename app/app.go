@@ -135,7 +135,7 @@ func (a *App) BaseCurrency(ctx context.Context) (core.Currency, error) {
 		return "", err
 	}
 	if !ok {
-		return "", fmt.Errorf("base_currency is not set. Set it with: moolah config set base_currency ILS")
+		return "", fmt.Errorf("base_currency is not set. Set it with: moolah config set base_currency USD (or your currency)")
 	}
 	return core.Currency(v), nil
 }

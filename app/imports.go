@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -177,7 +178,7 @@ func (a *App) rules(ctx context.Context, q store.Q) ([]importers.MatchRule, erro
 // already imported from the other account.
 func (a *App) Import(ctx context.Context, p ImportParams) (ImportResult, error) {
 	var res ImportResult
-	grid, err := importers.ReadFile(p.File)
+	data, err := os.ReadFile(p.File)
 	if err != nil {
 		return res, err
 	}
@@ -185,9 +186,32 @@ func (a *App) Import(ctx context.Context, p ImportParams) (ImportResult, error) 
 	if err != nil {
 		return res, err
 	}
+	// A text file that is not UTF-8 reads differently in each encoding, so each
+	// profile is matched against the file decoded with its own encoding.
+	grids := map[string]importers.Grid{}
+	gridFor := func(prof *importers.Profile) (importers.Grid, error) {
+		if g, ok := grids[prof.Encoding]; ok {
+			return g, nil
+		}
+		g, err := importers.ReadBytes(data, prof.Encoding)
+		if err == nil {
+			grids[prof.Encoding] = g
+		}
+		return g, err
+	}
 	name := p.Profile
 	if name == "" {
-		found := importers.DetectProfiles(profiles, grid, p.File)
+		var found []string
+		for n, prof := range profiles {
+			g, err := gridFor(prof)
+			if err != nil {
+				return res, err
+			}
+			if prof.Matches(g, p.File) {
+				found = append(found, n)
+			}
+		}
+		sort.Strings(found)
 		switch len(found) {
 		case 0:
 			return res, errors.New("no import profile matches this file. Write one (see: moolah profile show generic-csv), or choose one with --profile")
@@ -200,6 +224,10 @@ func (a *App) Import(ctx context.Context, p ImportParams) (ImportResult, error) 
 	prof, ok := profiles[name]
 	if !ok {
 		return res, fmt.Errorf("there is no profile %q. See: moolah profile list", name)
+	}
+	grid, err := gridFor(prof)
+	if err != nil {
+		return res, err
 	}
 	res.Profile = name
 	rows, bad, err := prof.Parse(grid)

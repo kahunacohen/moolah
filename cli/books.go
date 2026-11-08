@@ -24,8 +24,8 @@ type initFlags struct {
 }
 
 func (f *initFlags) register(cmd *cobra.Command) {
-	cmd.Flags().StringVar(&f.base, "base", "", "base currency for reports, for example ILS")
-	cmd.Flags().StringVar(&f.locale, "locale", "", "language and number format: en_US or he_IL")
+	cmd.Flags().StringVar(&f.base, "base", "", "base currency for reports, for example USD or EUR")
+	cmd.Flags().StringVar(&f.locale, "locale", "", "language and number format, for example en_US or de_DE (default: from your system)")
 	cmd.Flags().StringVar(&f.backupRecipient, "backup-recipient", "", "public key that encrypts backups (age1… or ssh-ed25519 …)")
 	cmd.Flags().BoolVar(&f.noBackupKey, "no-backup-key", false, "do not set a backup key (backups will ask for a passphrase)")
 	cmd.Flags().StringVar(&f.syncDir, "sync-dir", "", "folder that syncs this book with your other computers")
@@ -77,11 +77,12 @@ func (g *globals) createBook(f initFlags, loc app.Location) (*app.App, error) {
 			return a, nil
 		}
 	}
+	sysLocale, sysCurrency := app.SystemDefaults(g.env.Getenv)
 	if f.base == "" {
 		if !ask {
-			return nil, errors.New("--base is required, for example --base ILS")
+			return nil, errors.New("--base is required: your base currency, for example --base USD or --base EUR")
 		}
-		if f.base, err = g.in.ask("Base currency", "ILS"); err != nil {
+		if f.base, err = g.in.ask("Base currency (ISO code, for example USD, EUR, GBP)", string(sysCurrency)); err != nil {
 			return nil, err
 		}
 	}
@@ -90,9 +91,12 @@ func (g *globals) createBook(f initFlags, loc app.Location) (*app.App, error) {
 		return nil, err
 	}
 	if f.locale == "" {
-		f.locale = "en_US"
+		f.locale = sysLocale
+		if f.locale == "" {
+			f.locale = "en_US"
+		}
 		if ask {
-			if f.locale, err = g.in.ask("Language (en_US, he_IL)", "en_US"); err != nil {
+			if f.locale, err = g.in.ask("Language and number format (for example en_US, de_DE, he_IL)", f.locale); err != nil {
 				return nil, err
 			}
 		}

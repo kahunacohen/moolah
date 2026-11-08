@@ -15,9 +15,9 @@ moolah profile edit my-bank              # change it later in $EDITOR
 
 The format comes from the file's content, not its name:
 
-- **CSV**: UTF-8 (with or without BOM), UTF-16 with BOM, or Windows-1255 (Hebrew). The separator (`,` `;` tab `|`) is detected.
+- **CSV**: UTF-8 (with or without BOM) and UTF-16 with a BOM are recognized. Other files are read with the profile's `encoding` (default `windows-1252`). The separator (`,` `;` tab `|`) is detected.
 - **XLSX**: the first sheet.
-- **HTML saved as .xls**: many Israeli banks do this; moolah reads the largest table.
+- **HTML saved as .xls**: many banks do this; moolah reads the largest table.
 - **Old binary .xls** is not supported. Open it in a spreadsheet program and save it as .xlsx or .csv.
 
 Cells are cleaned: invisible direction marks (U+200E, U+200F) are removed and spaces are collapsed.
@@ -33,6 +33,7 @@ Every key below is optional unless it says **required**. Unknown keys are errors
 | `name` | **required.** Lower-case letters, digits, `-` and `_`. |
 | `description` | Shown in `moolah profile list`. |
 | `currency` | Currency of the amounts when the file has no currency column. Default: the account's currency. |
+| `encoding` | For text files that are **not** UTF-8: the file's character encoding, for example `windows-1252` (Western Europe), `windows-1255` (Hebrew), `windows-1251` (Cyrillic), `shift_jis`. Default `windows-1252`. UTF-8 files ignore it. |
 
 ### `[detect]`: recognizing the file
 
@@ -58,7 +59,7 @@ Values are header names, exactly as in the file (case and extra spaces do not ma
 | Key | Meaning |
 |---|---|
 | `date` | **required.** Transaction (purchase) date. |
-| `date_format` | A Go date layout: `2006` = year, `01` = month, `02` = day. For example `"02/01/2006"` for 31/12/2026, `"02-01-06"` for 31-12-26. Without it, moolah tries common day-first formats. Excel date numbers always work. |
+| `date_format` | A Go date layout: `2006` = year, `01` = month, `02` = day. For example `"02/01/2006"` for 31/12/2026, `"01/02/2006"` for 12/31/2026, `"02.01.06"` for 31.12.26. Without it, moolah reads only `YYYY-MM-DD` (and `YYYY/MM/DD`), because `03/10/2026` means different days in different countries. Excel date numbers always work. |
 | `charge_date`, `charge_date_format` | The date a card charged the purchase. Used by `report income --by charge-date`. |
 | `payee` | **required.** The description of the transaction. Rules match it. |
 | `memo` | Extra text. Saved as the note; rules also match it. |
@@ -73,7 +74,7 @@ Values are header names, exactly as in the file (case and extra spaces do not ma
 
 Only `date`, `payee` and the amount columns must exist in the file. Other columns may be missing; they are then ignored.
 
-Numbers may contain `₪ $ € £`, thousands separators, a trailing minus (`50.00-`) or parentheses (`(50.00)`).
+Numbers may contain any currency symbol or code (`€`, `$`, `¥`, `CHF`, …), thousands separators (including the Swiss `1'234.50`), a trailing minus (`50.00-`) or parentheses (`(50.00)`).
 
 ### `[currency_map]`
 
@@ -86,9 +87,9 @@ Maps values in currency columns to ISO codes:
 "€" = "EUR"
 ```
 
-## Example: a card export (adjust to your file)
+## Example: a Hebrew card export (adjust to your file)
 
-This example shows the shape of a typical Israeli card export. Real column names differ between companies and change over time, so check them against your own file.
+This example shows the shape of a typical Israeli card export: Hebrew headers, pending rows, foreign purchases and installments. Real column names differ between companies and change over time, so check them against your own file.
 
 ```toml
 name = "my-card"
@@ -119,10 +120,11 @@ installment_pattern = 'תשלום (\d+) מתוך (\d+)'
 "$" = "USD"
 ```
 
-## Example: a bank account with debit and credit columns
+## Example: a Hebrew bank account with debit and credit columns
 
 ```toml
 name = "my-bank"
+encoding = "windows-1255"   # Hebrew CSV exports are often not UTF-8
 
 [detect]
 headers = ["תאריך", "תיאור", "חובה", "זכות"]

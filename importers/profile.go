@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"path"
 	"regexp"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/BurntSushi/toml"
 	"github.com/shopspring/decimal"
@@ -21,9 +21,10 @@ import (
 type Profile struct {
 	Columns     Columns           `toml:"columns"`
 	Currency    string            `toml:"currency"`     // currency of the amounts when there is no currency column
-	CurrencyMap map[string]string `toml:"currency_map"` // values in currency columns → ISO codes, e.g. "₪" = "ILS"
+	CurrencyMap map[string]string `toml:"currency_map"` // values in currency columns → ISO codes, e.g. "€" = "EUR"
 	Description string            `toml:"description"`
 	Detect      Detect            `toml:"detect"`
+	Encoding    string            `toml:"encoding"` // for text files that are not UTF-8, e.g. "windows-1255"; default windows-1252
 	Name        string            `toml:"name"`
 	Table       Table             `toml:"table"`
 
@@ -109,6 +110,11 @@ func (p *Profile) validate() error {
 		return fmt.Errorf("profile %s: installment and installment_pattern go together", p.Name)
 	case p.Table.HeaderRow < 0:
 		return fmt.Errorf("profile %s: header_row must be 0 (auto) or a row number", p.Name)
+	}
+	if p.Encoding != "" {
+		if err := ValidEncoding(p.Encoding); err != nil {
+			return fmt.Errorf("profile %s: %w", p.Name, err)
+		}
 	}
 	if p.Currency != "" {
 		if _, err := core.ParseCurrency(p.Currency); err != nil {
@@ -388,10 +394,12 @@ func firstNonEmpty(a, b string) string {
 	return b
 }
 
-var defaultDateLayouts = []string{"2006-01-02", "02/01/2006", "02.01.2006", "02-01-2006", "02/01/06", "02.01.06", "02-01-06"}
+// defaultDateLayouts are tried when a profile has no date_format. Only unambiguous
+// formats are guessed: 03/10/2026 is March 10 in some countries and 3 October in
+// others, so it needs date_format.
+var defaultDateLayouts = []string{"2006-01-02", "2006/01/02"}
 
-// parseDate parses with the profile's layout, or common day-first layouts, or an
-// Excel serial number.
+// parseDate parses with the profile's layout, or an ISO date, or an Excel serial number.
 func parseDate(s, layout string) (core.Date, error) {
 	s = strings.TrimSpace(s)
 	if s == "" {
@@ -413,32 +421,45 @@ func parseDate(s, layout string) (core.Date, error) {
 	if layout != "" {
 		return core.Date{}, fmt.Errorf("%q does not match date_format %q", s, layout)
 	}
-	return core.Date{}, fmt.Errorf("%q is not a date; set date_format in the profile", s)
+	return core.Date{}, fmt.Errorf("%q is not a YYYY-MM-DD date; set date_format in the profile, for example \"02/01/2006\" for day/month/year", s)
 }
 
-var amountCleaner = strings.NewReplacer("₪", "", "$", "", "€", "", "£", "", "NIS", "", "ILS", "", " ", "", "−", "-")
-
-// ParseAmount reads "1,234.56", "-50", "50-", "(50.00)", "₪ 1,234" and, with
-// decimalComma, "1.234,56". An empty cell is zero.
+// ParseAmount reads bank number formats: "1,234.56", "-50", "50-", "(50.00)",
+// "€ 1,234", "1'234.50 CHF" and, with decimalComma, "1.234,56". Currency symbols,
+// currency codes and spaces are ignored. An empty cell is zero.
 func ParseAmount(s string, decimalComma bool) (decimal.Decimal, error) {
-	s = amountCleaner.Replace(strings.TrimSpace(s))
-	if s == "" {
+	var b strings.Builder
+	for _, r := range strings.TrimSpace(s) {
+		switch {
+		case r >= '0' && r <= '9', r == '.', r == ',', r == '-', r == '(', r == ')', r == '+':
+			b.WriteRune(r)
+		case r == '\u2212':
+			b.WriteRune('-')
+		case unicode.IsSpace(r), unicode.Is(unicode.Sc, r), unicode.IsLetter(r), r == '\'', r == '\u2019':
+			// currency symbols and codes, spaces, and the Swiss thousands separator
+		default:
+			return decimal.Decimal{}, fmt.Errorf("%q is not a number", s)
+		}
+	}
+	t := b.String()
+	if t == "" {
 		return decimal.Zero, nil
 	}
 	neg := false
-	if strings.HasPrefix(s, "(") && strings.HasSuffix(s, ")") {
-		neg, s = true, s[1:len(s)-1]
+	if strings.HasPrefix(t, "(") && strings.HasSuffix(t, ")") {
+		neg, t = true, t[1:len(t)-1]
 	}
-	if strings.HasSuffix(s, "-") {
-		neg, s = !neg, strings.TrimSuffix(s, "-")
+	if strings.HasSuffix(t, "-") {
+		neg, t = !neg, strings.TrimSuffix(t, "-")
 	}
+	t = strings.TrimPrefix(t, "+")
 	if decimalComma {
-		s = strings.ReplaceAll(s, ".", "")
-		s = strings.ReplaceAll(s, ",", ".")
+		t = strings.ReplaceAll(t, ".", "")
+		t = strings.ReplaceAll(t, ",", ".")
 	} else {
-		s = strings.ReplaceAll(s, ",", "")
+		t = strings.ReplaceAll(t, ",", "")
 	}
-	d, err := decimal.NewFromString(s)
+	d, err := decimal.NewFromString(t)
 	if err != nil {
 		return decimal.Decimal{}, fmt.Errorf("%q is not a number", s)
 	}
@@ -470,18 +491,6 @@ func Builtin() (map[string]string, error) {
 		out[p.Name] = string(b)
 	}
 	return out, nil
-}
-
-// DetectProfiles returns the names of the profiles that recognize the file, sorted.
-func DetectProfiles(profiles map[string]*Profile, g Grid, fileName string) []string {
-	var out []string
-	for name, p := range profiles {
-		if p.Matches(g, fileName) {
-			out = append(out, name)
-		}
-	}
-	sort.Strings(out)
-	return out
 }
 
 // Fingerprints identify rows across imports, so overlapping files do not create

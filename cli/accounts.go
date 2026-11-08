@@ -107,7 +107,7 @@ func accountCmd(g *globals) *cobra.Command {
 			})
 		},
 	}
-	add.Flags().StringVar(&currency, "currency", "", "the account's currency, for example ILS (cannot change later)")
+	add.Flags().StringVar(&currency, "currency", "", "the account's currency, for example USD or EUR (cannot change later)")
 	add.Flags().StringVar(&opening, "opening", "", "balance on the day you start using moolah for this account")
 	add.Flags().StringVar(&date, "date", "", "date of the opening balance (default: today)")
 

@@ -5,10 +5,10 @@ A personal finance tool for the command line, with an optional browser UI that r
 > **Status:** in development. This README describes the planned behavior.
 > **Works now:** books, accounts and categories, tags, `add`, `transfer`, `edit`, `delete`, `register`, `balance` (with `--in`), `value`, exchange rates (`price`, `rates fetch`, automatic download), `report networth`, `report income`, `config`, encrypted `backup`/`restore`, `check`, sync between computers (`sync`).
 > **Also works:** import (CSV, XLSX, HTML-as-XLS) with TOML profiles, duplicate detection, rules, `review`, transfer matching, `import undo`, `reconcile`.
-> **Also works:** the browser UI (`serve`), in English or Hebrew (right-to-left).
-> **Not built yet:** only one built-in import profile ships (`generic-csv`); profiles for Israeli banks and cards will be added from real (anonymized) export files. Investment holdings and lots (levels B/C) are not planned for now.
+> **Also works:** the browser UI (`serve`), in any language that has a translation file (English and Hebrew included), with right-to-left support.
+> **Not built yet:** only one built-in import profile ships (`generic-csv`); profiles for specific banks will be added from real (anonymized) export files. Writing your own takes a few lines of TOML. Investment holdings and lots (levels B/C) are not planned for now.
 
-moolah keeps track of your bank accounts, credit cards and retirement accounts in any currency, and reports everything in **one base currency that you choose** (for example Israeli shekels). Your data is one SQLite file on your computer. Nothing is sent anywhere, except requests for public exchange rates.
+moolah keeps track of your bank accounts, credit cards and retirement accounts in any currency, and reports everything in **one base currency that you choose** (for example euros or US dollars). Your data is one SQLite file on your computer. Nothing is sent anywhere, except requests for public exchange rates.
 
 ## Contents
 
@@ -26,7 +26,7 @@ moolah keeps track of your bank accounts, credit cards and retirement accounts i
 11. [Reports](#reports)
 12. [Reconciling with a statement](#reconciling-with-a-statement)
 13. [The browser UI](#the-browser-ui)
-14. [Hebrew and right-to-left text](#hebrew-and-right-to-left-text)
+14. [Languages and right-to-left text](#languages-and-right-to-left-text)
 15. [Backups](#backups)
 16. [Working on different machines](#working-on-different-machines)
 17. [Several sets of books](#several-sets-of-books)
@@ -53,7 +53,7 @@ moolah keeps track of your bank accounts, credit cards and retirement accounts i
 
 ## Main ideas
 
-**Accounts** are real places that hold money: bank accounts, cash, credit cards, loans, pension funds. Each account has **one currency**, the currency of its statement. A US credit card is a USD account. A Leumi checking account is an ILS account.
+**Accounts** are real places that hold money: bank accounts, cash, credit cards, loans, pension funds. Each account has **one currency**, the currency of its statement. A US credit card is a USD account. A checking account at a German bank is a EUR account.
 
 **Categories** describe where money comes from or goes to: `food`, `rent`, `salary`. Categories can have subcategories (`food:restaurants`). A category has no currency. It can collect spending in any currency.
 
@@ -89,8 +89,8 @@ moolah completion zsh  > "${fpath[1]}/_moolah"                               # z
 moolah init
 
 # 2. Add your real accounts with their opening balances.
-moolah account add assets:bank:leumi   --currency ILS --opening 25000 --date 2026-11-01
-moolah account add liabilities:card:max --currency ILS
+moolah account add assets:bank:checking   --currency EUR --opening 25000 --date 2026-11-01
+moolah account add liabilities:card:visa --currency EUR
 moolah account add liabilities:card:chase --currency USD
 
 # 3. moolah init created starter categories. Look at them, and add your own.
@@ -98,9 +98,9 @@ moolah category list
 moolah category add food:coffee
 
 # 4. Record a purchase.
-moolah add card:max -85 restaurants --payee "Cafe Landwer"
+moolah add card:visa -85 restaurants --payee "Corner Cafe"
 
-# 5. See your balances in shekels.
+# 5. See your balances in your base currency.
 moolah balance
 ```
 
@@ -110,14 +110,14 @@ An account name has a type, then one or more levels, separated by `:`.
 
 | Type | Use for | Examples |
 |---|---|---|
-| `assets` | things you own | `assets:bank:leumi`, `assets:cash`, `assets:invest:pension` |
-| `liabilities` | money you owe | `liabilities:card:max`, `liabilities:mortgage` |
+| `assets` | things you own | `assets:bank:checking`, `assets:cash`, `assets:invest:pension` |
+| `liabilities` | money you owe | `liabilities:card:visa`, `liabilities:mortgage` |
 
 ```sh
-moolah account add assets:bank:leumi --currency ILS
-moolah account add assets:bank:leumi --currency ILS --opening 25000 --date 2026-11-01
+moolah account add assets:bank:checking --currency EUR
+moolah account add assets:bank:checking --currency EUR --opening 25000 --date 2026-11-01
 moolah account list
-moolah account rename assets:bank:leumi assets:bank:leumi-checking
+moolah account rename assets:bank:checking assets:bank:main-checking
 moolah account merge assets:cash:wallet assets:cash      # moves all history, then removes the first
 moolah account close liabilities:card:old --date 2026-10-31
 ```
@@ -126,7 +126,7 @@ moolah account close liabilities:card:old --date 2026-10-31
 - The **opening balance** is the balance on the day you start using moolah for this account.
 - A parent level must exist before a child. `moolah init` creates the top levels.
 - You cannot delete an account that has transactions. Merge it into another account, or close it. A closed account keeps its history but accepts no new transactions after the close date.
-- **Short names** work everywhere when they are unique: `leumi` means `assets:bank:leumi`.
+- **Short names** work everywhere when they are unique: `checking` means `assets:bank:checking`.
 
 **Sign of balances:** a negative balance on a card or loan means you owe money. A purchase on a card makes the card balance more negative.
 
@@ -160,9 +160,9 @@ moolah category close hobbies:golf --date 2026-12-31
 ```sh
 moolah add <account> <amount> <category> [--date YYYY-MM-DD] [--payee TEXT] [--note TEXT]
 
-moolah add leumi -200 food:groceries --payee "Shufersal"
-moolah add card:max -85 restaurants --date 2026-11-02
-moolah add leumi 18500 salary --payee "Employer Ltd"        # income: positive amount
+moolah add checking -200 food:groceries --payee "Supermarket"
+moolah add card:visa -85 restaurants --date 2026-11-02
+moolah add checking 18500 salary --payee "Employer Ltd"        # income: positive amount
 ```
 
 The date is today if you don't give one. The amount is in the account's currency, so you don't write a currency.
@@ -170,15 +170,15 @@ The date is today if you don't give one. The amount is in the account's currency
 **A transfer between two of your accounts** (including paying a credit card):
 
 ```sh
-moolah transfer leumi card:max 3200                        # pay the Max card from Leumi
-moolah transfer leumi assets:bank:savings 5000 --date 2026-11-10
+moolah transfer checking card:visa 3200                        # pay the Visa card from checking
+moolah transfer checking assets:bank:savings 5000 --date 2026-11-10
 ```
 
 **A transaction with more than two lines** (for example, a split purchase):
 
 ```sh
 moolah add --payee "Super-Pharm" \
-  --posting leumi=-300 \
+  --posting checking=-300 \
   --posting health=180 \
   --posting household=120
 ```
@@ -188,7 +188,7 @@ The lines must add up to zero in each currency, or moolah rejects the transactio
 **Tags** group transactions across categories, for example everything for one trip:
 
 ```sh
-moolah add card:max -1840 travel:flights --tag vacation-2026
+moolah add card:visa -1840 travel:flights --tag vacation-2026
 moolah add card:chase -96 restaurants --tag vacation-2026
 moolah report income --tag vacation-2026        # what did the trip cost?
 moolah tag list
@@ -199,7 +199,7 @@ Unlike categories, a new tag is created when you first use it.
 **See and change transactions:**
 
 ```sh
-moolah register leumi                    # transactions of one account, with running balance
+moolah register checking                    # transactions of one account, with running balance
 moolah register --category food --from 2026-10-01
 moolah edit <transaction-id>             # opens the transaction in $EDITOR
 moolah delete <transaction-id>
@@ -213,21 +213,21 @@ moolah delete <transaction-id>
 |---|---|
 | USD purchase on a US card | `moolah add card:chase -42.17 shopping` (USD, because the account is USD) |
 | EUR purchase on a US card | the **USD amount the card charged**: `moolah add card:chase -41.30 travel --note "38 EUR"` |
-| Foreign purchase on an Israeli card | the **ILS amount the card charged**. Import stores the original amount for you. |
-| Pay a USD card from an ILS account | `moolah transfer leumi card:chase 1530 --to-amount 420` (1,530 ₪ left Leumi; the card got 420 $) |
-| A transfer with a bank fee | `moolah transfer leumi card:chase 1530 --to-amount 420 --fee 15` (fee goes to `fees`) |
+| Foreign purchase on a card in your own currency | the **amount the card charged**, in the card's currency. Import stores the original amount for you. |
+| Pay a USD card from a EUR account | `moolah transfer checking card:chase 390 --to-amount 420` (390 € left the checking account; the card got 420 $) |
+| A transfer with a bank fee | `moolah transfer checking card:chase 390 --to-amount 420 --fee 5` (fee goes to `fees`) |
 
-When a transfer has two currencies, moolah saves the rate you actually got (here 1530 ÷ 420 = 3.643). Reports can compare it with the official rate, which shows how much the bank charged for the conversion.
+When a transfer has two currencies, moolah saves the rate you actually got (here 390 ÷ 420 = 0.929 EUR per USD). Reports can compare it with the official rate, which shows how much the bank charged for the conversion.
 
 ## Importing bank and card files
 
 Most data should come from your bank and card exports, not from typing.
 
 ```sh
-moolah import ~/Downloads/max-2026-10.xlsx --account card:max
+moolah import ~/Downloads/visa-2026-10.xlsx --account card:visa
 ```
 
-1. **moolah reads the file.** CSV (UTF-8 or Windows-1255), XLSX and XLS are supported, including Israeli exports with Hebrew headers, title rows and total rows.
+1. **moolah reads the file.** CSV, XLSX, and HTML tables saved as .xls are supported, in any language, including exports with title rows and total rows. Files that are not UTF-8 are read with the encoding the profile names (default Windows-1252).
 2. **It detects the bank format** automatically. To choose a format yourself, use `--profile <name>`. `moolah profile list` lists the supported formats. After the first import, `--account` is optional: moolah remembers which account each format belongs to.
 3. **It skips rows you already imported.** You can import overlapping periods safely.
 4. **It applies your rules** to choose a category. Rows with no matching rule go to `uncategorized`.
@@ -239,9 +239,9 @@ moolah import ~/Downloads/max-2026-10.xlsx --account card:max
 **Rules** choose a category from the payee text (a regular expression, not case-sensitive):
 
 ```sh
-moolah rule add 'shufersal|שופרסל|rami levy|רמי לוי' food:groceries
+moolah rule add 'supermarket|grocer|aldi|lidl' food:groceries
 moolah rule add 'netflix|spotify' subscriptions
-moolah rule add 'paz|דלק|sonol' car:fuel --max-amount 500
+moolah rule add 'shell|esso|bp ' transport:fuel --max-amount 200
 moolah rule list
 moolah rule remove 3
 ```
@@ -255,18 +255,18 @@ moolah import list            # earlier imports with their IDs
 moolah import undo 17         # removes everything import 17 created
 ```
 
-**Installments** (`תשלומים`): each monthly charge is imported as the card charged it, for example 100 ₪ per month for a 1,200 ₪ purchase in 12 payments. moolah keeps "payment 3 of 12" with the transaction.
+**Installments** (a purchase that the card splits into monthly payments): each monthly charge is imported as the card charged it, for example 100 € per month for a 1,200 € purchase in 12 payments. moolah keeps "payment 3 of 12" with the transaction.
 
-**Foreign purchases on Israeli cards:** the ILS amount charged is recorded. The original amount and currency are kept with the transaction.
+**Foreign purchases:** the amount charged, in the card's currency, is recorded. The original amount and currency are kept with the transaction.
 
 **Your bank's format is not supported?** Write a small TOML profile for it. No programming or rebuild is needed. See [Adding an import profile](#adding-an-import-profile).
 
 ## Pension and retirement accounts
 
-For pension funds, Keren Hishtalmut, Kupat Gemel, 401(k) and IRA accounts, you usually only know the total value from the statement. moolah tracks the value and calculates the gain.
+For pension funds and retirement savings plans (401(k), IRA, and similar), you usually only know the total value from the statement. moolah tracks the value and calculates the gain.
 
 ```sh
-moolah account add assets:invest:pension     --currency ILS --opening 380000 --date 2026-01-01
+moolah account add assets:invest:pension     --currency EUR --opening 380000 --date 2026-01-01
 moolah account add assets:invest:401k        --currency USD --opening 52000  --date 2026-01-01
 
 # Deposits are normal transactions, so they are not counted as gains:
@@ -280,7 +280,7 @@ moolah value pension 412300 --date 2026-10-31
 
 > gain for a period = change in value − deposits
 
-For a USD account like a 401(k), reports in shekels show the market gain and the currency effect separately.
+For a USD account like a 401(k), reports in your base currency show the market gain and the currency effect separately.
 
 ## Exchange rates
 
@@ -335,12 +335,12 @@ moolah report income --month 2026-10 --by charge-date   # card purchases by bill
 The net-worth report shows how the difference happened:
 
 ```
-Net worth 2026-01-01                    412,300 ₪
-  + income                              231,000 ₪
-  − spending                           -198,400 ₪
-  + investment gains                     21,700 ₪
-  + currency effect                      -6,150 ₪
-Net worth 2026-10-31                    460,450 ₪
+Net worth 2026-01-01                    412,300 €
+  + income                              231,000 €
+  − spending                           -198,400 €
+  + investment gains                     21,700 €
+  + currency effect                      -6,150 €
+Net worth 2026-10-31                    460,450 €
 ```
 
 **Output formats:** `--format table` (default), `--format csv`, `--format json`. Use CSV or JSON to process the data with other tools.
@@ -350,7 +350,7 @@ Net worth 2026-10-31                    460,450 ₪
 Check that moolah agrees with your bank or card statement:
 
 ```sh
-moolah reconcile card:max --balance -4210.50 --date 2026-10-31
+moolah reconcile card:visa --balance -4210.50 --date 2026-10-31
 ```
 
 If the balances are different, moolah lists the transactions near that date that may be missing or duplicated.
@@ -368,12 +368,14 @@ Your browser opens automatically. The browser UI has the same features as the co
 - `--port 8080` uses a fixed port. `--no-browser` doesn't open a browser.
 - The server stops when you press Ctrl+C or close the terminal.
 
-## Hebrew and right-to-left text
+## Languages and right-to-left text
 
-- Payees, notes and category names can be in Hebrew or any language.
-- Set the interface language: `moolah config set locale he_IL` (Hebrew, right-to-left) or `en_US`. Numbers and dates use the format of the locale.
-- The browser UI changes to right-to-left for Hebrew.
-- Terminals display mixed Hebrew and English text badly. If table output looks wrong, use `--format csv` or the browser UI.
+- Payees, notes and category names can be in any language.
+- Set the language and number format: `moolah config set locale de_DE` (or `en_US`, `fr_FR`, `he_IL`, …). `moolah init` suggests the locale from your system.
+- Numbers are shown the way the language writes them: `1,234.56` in English, `1.234,56` in German. When you **type** an amount, always use a dot for decimals (`-85.50`), in every language.
+- The browser UI uses a translation file for the language if one exists (English and Hebrew are included; others fall back to English). To add one, copy `web/i18n/en.json` to `web/i18n/<language>.json` and translate it.
+- Languages written right to left (Hebrew, Arabic, Persian, Urdu, …) switch the browser UI to right-to-left.
+- Terminals display mixed right-to-left and left-to-right text badly. If table output looks wrong, use `--format csv` or the browser UI.
 
 ## Backups
 
@@ -407,7 +409,7 @@ You can use moolah on several computers, for example a desktop at home and a lap
 ```
 $ moolah init
 Sync folder for your other computers (Enter to skip): ~/Dropbox/moolah
-Base currency [ILS]: ILS
+Base currency (ISO code, for example USD, EUR, GBP) [EUR]:
 Language (en_US, he_IL) [en_US]: he_IL
 Encryption key for backups and sync: 'new' (create one), 'ssh' (~/.ssh/id_ed25519.pub), a public key, or 'none' (a passphrase each time) [new]:
 Created the encryption key ~/.config/moolah/age-key.txt. Keep a copy somewhere safe; copy it to your other computers.
@@ -519,7 +521,7 @@ When you have more than one book, reports and the browser UI show the book name 
 | `unknown account "X". Did you mean …?` | The name doesn't exist. Use the suggestion, or create it with `account add` / `category add`. |
 | `"food" is ambiguous: expenses:food, income:food` | A short name matches more than one. Write more of the name. |
 | `transaction does not balance: USD +12.00` | The lines don't add up to zero in that currency. Check the amounts. |
-| `no USD→ILS rate on or before 2026-09-14` | No rate is stored and moolah couldn't download one. Connect to the network and run `moolah rates fetch`, or add the rate with `moolah price add`. |
+| `no USD→EUR rate on or before 2026-09-14` | No rate is stored and moolah couldn't download one. Connect to the network and run `moolah rates fetch`, or add the rate with `moolah price add`. |
 | `account card:old is closed since 2026-10-31` | The transaction date is after the close date. |
 | `conflict: laptop and desktop both changed data` | See [Working on different machines](#working-on-different-machines). Choose a copy with `moolah sync resolve`. |
 | `changed elsewhere, reload` (browser) | The transaction was changed in another tab or by a CLI command after you opened it. Reload the page and edit again. |
@@ -701,8 +703,8 @@ Use read-only mode. Changing data with SQL skips moolah's rules. Make a backup f
 |---|---|
 | `database is locked` | Another long write is running (for example a big import). Wait and try again. If no moolah process is running, check for a stuck process with `pgrep moolah`. |
 | Browser shows "invalid token" | Open the URL that `moolah serve` printed, including `?token=`. |
-| Rates fail to download | Check the network, and run `moolah rates fetch -v` to see the request and the error. The Bank of Israel API sometimes changes; enter missing rates with `moolah price add` until moolah is updated. |
-| Hebrew text looks reversed in the terminal | A terminal limitation. Use `--format csv` or the browser UI. |
+| Rates fail to download | Check the network, and run `moolah rates fetch -v` to see the request and the error. A rates API sometimes changes. Try it with `moolah source test <name> USD EUR`, fix the source with `moolah source edit <name>`, or enter rates with `moolah price add`. |
+| Right-to-left text (Hebrew, Arabic) looks reversed in the terminal | A terminal limitation. Use `--format csv` or the browser UI. |
 | An import gave wrong amounts or dates | `moolah import undo <id>`, then report the problem with a sample file (personal details removed). |
 
 ## Development
@@ -731,22 +733,23 @@ A profile is a small TOML file. No code change and no rebuild are needed. Profil
 2. Change the name, header names, columns and date format to match your file. Example:
    ```toml
    name = "my-bank"
+   encoding = "windows-1252"     # only for files that are not UTF-8
 
    [detect]
-   headers = ["תאריך", "תיאור", "חובה", "זכות"]
+   headers = ["Booking date", "Description", "Debit", "Credit"]
 
    [table]
-   stop = "סה\"כ"
+   stop = "Total"
 
    [columns]
-   date = "תאריך"
-   date_format = "02/01/2006"
-   payee = "תיאור"
-   debit = "חובה"
-   credit = "זכות"
+   date = "Booking date"
+   date_format = "02.01.2006"    # day.month.year
+   payee = "Description"
+   debit = "Debit"
+   credit = "Credit"
    ```
 3. Save it in moolah: `moolah profile add my-bank.toml`. moolah checks it and shows any error.
-4. Test it without importing anything: `moolah import test ~/Downloads/export.xls --profile my-bank --account leumi`. Check that the dates, amounts and signs are correct.
+4. Test it without importing anything: `moolah import test ~/Downloads/export.xls --profile my-bank --account checking`. Check that the dates, amounts and signs are correct.
 5. Fix things with `moolah profile edit my-bank` (opens your `$EDITOR` and checks the profile when you save).
 6. Import as usual. moolah finds the profile automatically from then on, and remembers which account it belongs to.
 
