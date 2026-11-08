@@ -1,7 +1,5 @@
 # moolah — instructions for Claude
 
-**This is a personal open-source project, not a Matav project.** The Matav-specific rules in the org-level CLAUDE.md (Jira tickets, `matav-server` schema files, `matav-mcp`, feature branches off `staging`) do not apply here. Committing directly on `main` is allowed.
-
 moolah is a personal finance tool: a Go CLI plus a local htmx web UI over one SQLite file per "book". The design and its decisions are in `docs/design.md`. Read it before changing behavior.
 
 ## How this project is developed
