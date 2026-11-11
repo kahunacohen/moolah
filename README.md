@@ -245,12 +245,36 @@ moolah rule remove 3
 
 Rules are checked in order. The first match wins. During `moolah review`, you can save your choice as a new rule.
 
+**Payments between your own accounts.** A rule can point to one of your accounts instead of a category. Then the row is a transfer, not spending:
+
+```sh
+moolah rule add 'visa payment' liabilities:card:visa     # in the bank export
+moolah rule add 'payment thank you' assets:bank:checking # in the card export
+```
+
+The payment appears in both exports, but moolah records it once: the row from the second file is linked to the transfer that the first file created (same accounts, same amount, at most 5 days apart).
+
+When the two accounts have **different currencies** (a EUR account pays a USD card), each export has only one of the two amounts:
+
+1. The first file's row **waits**. `moolah import` says so, and nothing is recorded yet.
+2. When you import the other file, moolah looks for a waiting row whose amount fits the stored exchange rate (within 5%). If exactly one fits, it records one transfer with both amounts, and the rate you really got.
+3. If none fits, or more than one, or moolah has no exchange rate, nothing is guessed: the rows keep waiting. `moolah review` shows them, with the other export's amount when there is one, and asks for the amount that arrived:
+   ```sh
+   moolah review --list
+   moolah review transfer 57 1200      # 1,200 USD arrived on the card
+   ```
+   The browser's review page does the same.
+
+A transfer you recorded yourself with `moolah transfer … --to-amount …` is found by both imports, so nothing is added twice.
+
 **Undo an import:**
 
 ```sh
 moolah import list            # earlier imports with their IDs
 moolah import undo 17         # removes everything import 17 created
 ```
+
+If import 17 completed a waiting transfer, undoing it removes that transfer, and the row from the other file waits again.
 
 **Installments** (a purchase that the card splits into monthly payments): each monthly charge is imported as the card charged it, for example 100 € per month for a 1,200 € purchase in 12 payments. moolah keeps "payment 3 of 12" with the transaction.
 

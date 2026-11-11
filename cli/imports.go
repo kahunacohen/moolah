@@ -43,7 +43,14 @@ func importCmd(g *globals) *cobra.Command {
 					if res.Matched > 0 {
 						fmt.Fprintf(g.out(), ", %d linked to transfers already recorded", res.Matched)
 					}
+					if res.Paired > 0 {
+						fmt.Fprintf(g.out(), ", %s completed with the other account's export", count(res.Paired, "transfer", "transfers"))
+					}
 					fmt.Fprintln(g.out(), ".")
+					if res.Waiting > 0 {
+						fmt.Fprintf(g.out(), "%s to an account in another currency %s for the other account's export, which has the other amount.\n"+
+							"Import it, or give the amount with: moolah review\n", count(res.Waiting, "transfer", "transfers"), plural(res.Waiting, "waits", "wait"))
+					}
 					if res.Batch != 0 {
 						fmt.Fprintf(g.out(), "Import ID %d (undo with: moolah import undo %d).\n", res.Batch, res.Batch)
 					}
@@ -304,21 +311,24 @@ func reviewCmd(g *globals) *cobra.Command {
 				if err != nil {
 					return err
 				}
-				if len(items) == 0 {
+				waiting, err := a.WaitingTransfers(cmd.Context())
+				if err != nil {
+					return err
+				}
+				if len(items) == 0 && len(waiting) == 0 {
 					fmt.Fprintln(g.out(), "Nothing to review: every transaction has a category.")
 					return nil
 				}
 				if listOnly || !g.env.Interactive {
-					t := &table{headers: []string{"ID", "Date", "Payee", "Account", "Amount"}, right: map[int]bool{0: true, 4: true}}
-					for _, it := range items {
-						t.add(strconv.FormatInt(it.Tx.ID, 10), it.Tx.Date.String(), it.Tx.Payee, it.Account, it.Amount.String())
-					}
-					if g.format == "table" {
-						fmt.Fprintf(g.out(), "%d transactions have no category. Set one with: moolah review set <id> <category>\n\n", len(items))
-					}
-					return g.render(t, items)
+					return g.reviewList(items, waiting)
 				}
-				return g.reviewLoop(cmd, a, items)
+				if len(items) > 0 {
+					quit, err := g.reviewLoop(cmd, a, items)
+					if err != nil || quit {
+						return err
+					}
+				}
+				return g.waitingLoop(cmd, a, waiting)
 			})
 		},
 	}
@@ -340,11 +350,66 @@ func reviewCmd(g *globals) *cobra.Command {
 			})
 		},
 	}
-	cmd.AddCommand(set)
+	transfer := &cobra.Command{
+		Use:     "transfer <id> <amount>",
+		Short:   "Complete a transfer between currencies with the amount on the other account",
+		Example: "  moolah review transfer 57 1200    # 1,200 arrived on the other account",
+		Args:    cobra.ExactArgs(2),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			id, err := strconv.ParseInt(args[0], 10, 64)
+			if err != nil {
+				return fmt.Errorf("invalid ID %q; see: moolah review --list", args[0])
+			}
+			return g.withBook(func(a *app.App) error {
+				t, err := a.CompleteTransfer(cmd.Context(), app.CompleteTransferParams{ID: id, Amount: args[1]})
+				if err != nil {
+					return err
+				}
+				fmt.Fprintf(g.out(), "Recorded transaction %d.\n", t.ID)
+				return nil
+			})
+		},
+	}
+	cmd.AddCommand(set, transfer)
 	return cmd
 }
 
-func (g *globals) reviewLoop(cmd *cobra.Command, a *app.App, items []app.ReviewItem) error {
+func (g *globals) reviewList(items []app.ReviewItem, waiting []app.WaitingTransfer) error {
+	if len(items) > 0 {
+		t := &table{headers: []string{"ID", "Date", "Payee", "Account", "Amount"}, right: map[int]bool{0: true, 4: true}}
+		for _, it := range items {
+			t.add(strconv.FormatInt(it.Tx.ID, 10), it.Tx.Date.String(), it.Tx.Payee, it.Account, it.Amount.String())
+		}
+		if g.format == "table" {
+			fmt.Fprintf(g.out(), "%d transactions have no category. Set one with: moolah review set <id> <category>\n\n", len(items))
+		}
+		if err := g.render(t, items); err != nil {
+			return err
+		}
+	}
+	if len(waiting) == 0 {
+		return nil
+	}
+	if len(items) > 0 && g.format == "table" {
+		fmt.Fprintln(g.out())
+	}
+	t := &table{headers: []string{"ID", "Date", "Payee", "Account", "Amount", "To", "Probably"}, right: map[int]bool{0: true, 4: true, 6: true}}
+	for _, w := range waiting {
+		probably := ""
+		if w.Suggested != nil {
+			probably = w.Suggested.String()
+		}
+		t.add(strconv.FormatInt(w.ID, 10), w.Date.String(), w.Payee, w.Account, w.Amount.String(), w.Target, probably)
+	}
+	if g.format == "table" {
+		fmt.Fprintf(g.out(), "%s between currencies %s for the other amount. Import the other account's file,\n"+
+			"or give the amount with: moolah review transfer <id> <amount>\n\n", count(len(waiting), "transfer", "transfers"), plural(len(waiting), "waits", "wait"))
+	}
+	return g.render(t, waiting)
+}
+
+// reviewLoop asks for a category for each item. It reports whether the user quit.
+func (g *globals) reviewLoop(cmd *cobra.Command, a *app.App, items []app.ReviewItem) (bool, error) {
 	ctx := cmd.Context()
 	skipped := map[int64]bool{}
 	done := 0
@@ -361,7 +426,7 @@ func (g *globals) reviewLoop(cmd *cobra.Command, a *app.App, items []app.ReviewI
 		}
 		if next == nil {
 			fmt.Fprintf(g.out(), "Done: %d categorized.\n", done)
-			return nil
+			return false, nil
 		}
 		fmt.Fprintf(g.out(), "\n%s  %s  %s  (%s), %d left\n", next.Tx.Date, next.Tx.Payee, next.Amount, next.Account, left)
 		if inst := app.FormatInstallment(next.Tx.Meta); inst != "" {
@@ -369,7 +434,7 @@ func (g *globals) reviewLoop(cmd *cobra.Command, a *app.App, items []app.ReviewI
 		}
 		ans, err := g.in.ask("Category (Enter = skip, q = quit)", "")
 		if err != nil {
-			return err
+			return false, err
 		}
 		switch ans {
 		case "":
@@ -377,7 +442,7 @@ func (g *globals) reviewLoop(cmd *cobra.Command, a *app.App, items []app.ReviewI
 			continue
 		case "q":
 			fmt.Fprintf(g.out(), "Stopped: %d categorized. Run moolah review again to continue.\n", done)
-			return nil
+			return true, nil
 		}
 		name, err := a.Categorize(ctx, app.CategorizeParams{TxID: next.Tx.ID, Version: next.Tx.Version, Category: ans})
 		if err != nil {
@@ -388,12 +453,12 @@ func (g *globals) reviewLoop(cmd *cobra.Command, a *app.App, items []app.ReviewI
 		fmt.Fprintf(g.out(), "  → %s\n", name)
 		rule, err := g.in.confirmDefault("  Always use "+name+" for this payee (add a rule)?", false)
 		if err != nil {
-			return err
+			return false, err
 		}
 		if rule {
 			pattern, err := g.in.ask("  Pattern", app.SuggestPattern(next.Tx.Payee))
 			if err != nil {
-				return err
+				return false, err
 			}
 			_, n, err := a.AddRule(ctx, app.RuleParams{Pattern: pattern, Account: name})
 			if err != nil {
@@ -404,6 +469,54 @@ func (g *globals) reviewLoop(cmd *cobra.Command, a *app.App, items []app.ReviewI
 			}
 		}
 		if items, err = a.Review(ctx); err != nil {
+			return false, err
+		}
+	}
+}
+
+// waitingLoop asks for the other amount of each transfer between currencies.
+func (g *globals) waitingLoop(cmd *cobra.Command, a *app.App, waiting []app.WaitingTransfer) error {
+	ctx := cmd.Context()
+	skipped := map[int64]bool{}
+	done := 0
+	for {
+		var next *app.WaitingTransfer
+		for i := range waiting {
+			if !skipped[waiting[i].ID] {
+				next = &waiting[i]
+				break
+			}
+		}
+		if next == nil {
+			if done > 0 || len(skipped) > 0 {
+				fmt.Fprintf(g.out(), "Done: %s recorded.\n", count(done, "transfer", "transfers"))
+			}
+			return nil
+		}
+		fmt.Fprintf(g.out(), "\n%s  %s  %s  (%s → %s), waits for the amount on %s\n",
+			next.Date, next.Payee, next.Amount, next.Account, next.Target, next.Target)
+		if next.Suggested != nil {
+			fmt.Fprintf(g.out(), "  Probably the other side: %s, imported from %s\n", next.Suggested, next.Target)
+		}
+		ans, err := g.in.ask(fmt.Sprintf("Amount in %s (Enter = keep waiting, q = quit)", next.TargetCur), "")
+		if err != nil {
+			return err
+		}
+		switch ans {
+		case "":
+			skipped[next.ID] = true
+			continue
+		case "q":
+			return nil
+		}
+		t, err := a.CompleteTransfer(ctx, app.CompleteTransferParams{ID: next.ID, Amount: ans})
+		if err != nil {
+			fmt.Fprintln(g.env.Stderr, "error: "+err.Error())
+			continue
+		}
+		done++
+		fmt.Fprintf(g.out(), "  → transaction %d\n", t.ID)
+		if waiting, err = a.WaitingTransfers(ctx); err != nil {
 			return err
 		}
 	}
@@ -434,6 +547,12 @@ func reconcileCmd(g *globals) *cobra.Command {
 					return nil
 				}
 				fmt.Fprintf(g.out(), "Different: the statement says %s, moolah says %s (difference %s).\n", res.Statement, res.Book, res.Difference)
+				if len(res.Waiting) > 0 {
+					fmt.Fprintln(g.out(), "\nImported transfers that are not recorded yet (complete them with: moolah review):")
+					for _, w := range res.Waiting {
+						fmt.Fprintf(g.out(), "  %s %s %s → %s\n", w.Date, w.Payee, w.Amount, w.Target)
+					}
+				}
 				if len(res.Duplicates) > 0 {
 					fmt.Fprintln(g.out(), "\nPossible duplicates:")
 					for _, d := range res.Duplicates {

@@ -21,6 +21,10 @@ import (
 // transferWindow is how many days apart the two sides of a transfer may be booked.
 const transferWindow = 5
 
+// rateTolerance is how far the two amounts of a transfer between currencies may be
+// from the stored exchange rate (banks add a margin), as a fraction.
+var rateTolerance = decimal.RequireFromString("0.05")
+
 // ProfileInfo describes an import profile.
 type ProfileInfo struct {
 	Builtin     bool // shipped with moolah
@@ -132,7 +136,7 @@ type ImportRow struct {
 	Date     core.Date
 	Line     int
 	Payee    string
-	Status   string // new, duplicate, matched (linked to an existing transfer), error
+	Status   string // new, duplicate, matched (linked to an existing transfer), paired (with a waiting row from the other account), waiting (for the other account's export), error
 }
 
 // ImportResult summarizes an import.
@@ -143,9 +147,11 @@ type ImportResult struct {
 	Errors        []string
 	Matched       int
 	New           int
+	Paired        int // transfers between currencies completed with a waiting row
 	Profile       string
 	Rows          []ImportRow
 	Uncategorized int
+	Waiting       int // transfers between currencies waiting for the other account's export
 }
 
 func (a *App) rules(ctx context.Context, q store.Q) ([]importers.MatchRule, error) {
@@ -237,6 +243,10 @@ func (a *App) Import(ctx context.Context, p ImportParams) (ImportResult, error) 
 	for _, b := range bad {
 		res.Errors = append(res.Errors, b.Error())
 	}
+	ix, err := a.PriceIndex(ctx)
+	if err != nil {
+		return res, err
+	}
 	err = a.st.InTx(ctx, func(tx *store.Tx) error {
 		tree, err := tx.Tree(ctx)
 		if err != nil {
@@ -299,15 +309,28 @@ func (a *App) Import(ctx context.Context, p ImportParams) (ImportResult, error) 
 			if target.ID == uncat.ID {
 				res.Uncategorized++
 			}
+			if target.Type.IsReal() && target.Currency != acct.Currency {
+				status, err := a.importCrossTransfer(ctx, tx, crossTransferParams{Acct: acct, Batch: res.Batch, DryRun: p.DryRun,
+					Fingerprint: fps[i], Index: ix, Row: r, Tags: tags, Target: target, Tree: tree})
+				if err != nil {
+					return err
+				}
+				row.Status = status
+				switch status {
+				case "matched":
+					res.Matched++
+				case "paired":
+					res.Paired++
+				default:
+					res.Waiting++
+				}
+				res.Rows = append(res.Rows, row)
+				continue
+			}
 			var txID int64
 			matched := false
 			if target.Type.IsReal() {
-				if target.Currency != acct.Currency {
-					fail(fmt.Errorf("the rule points to %s (%s), but this row is in %s; record it with moolah transfer",
-						tree.Path(target.ID), target.Currency, acct.Currency))
-					continue
-				}
-				txID, err = findTransfer(ctx, tx, acct.ID, target.ID, r.Amount, r.Date)
+				txID, err = findTransfer(ctx, tx, findTransferParams{Account: acct.ID, Amount: r.Amount, Date: r.Date, Other: target.ID})
 				if err != nil {
 					return err
 				}
@@ -336,13 +359,13 @@ func (a *App) Import(ctx context.Context, p ImportParams) (ImportResult, error) 
 				}
 				txID = id
 			}
-			if err := tx.InsertImportedRow(ctx, store.ImportedRow{AccountID: acct.ID, BatchID: res.Batch, Fingerprint: fps[i],
+			if _, err := tx.InsertImportedRow(ctx, store.ImportedRow{AccountID: acct.ID, BatchID: res.Batch, Fingerprint: fps[i],
 				Line: r.Line, Matched: matched, Raw: r.Raw, TransactionID: txID}); err != nil {
 				return err
 			}
 			res.Rows = append(res.Rows, row)
 		}
-		if !p.DryRun && res.New+res.Matched == 0 {
+		if !p.DryRun && res.New+res.Matched+res.Paired+res.Waiting == 0 {
 			res.Batch = 0
 			return tx.DeleteBatchIfEmpty(ctx)
 		}
@@ -378,11 +401,19 @@ func importedTx(r importers.Row, acct, target core.Account, tags []string) core.
 	}
 }
 
+type findTransferParams struct {
+	Account int64           // the account of the imported row
+	Amount  decimal.Decimal // the row's amount on Account
+	Date    core.Date
+	Other   int64 // the account the rule points to
+}
+
 // findTransfer looks for a transfer already recorded from the other account: two
-// lines, `amount` on account and -amount on other, within a few days, not yet
-// linked to an import into account.
-func findTransfer(ctx context.Context, tx *store.Tx, account, other int64, amount decimal.Decimal, date core.Date) (int64, error) {
-	txs, err := tx.TransactionsNear(ctx, other, date.AddDays(-transferWindow), date.AddDays(transferWindow))
+// lines, the row's amount on Account and the opposite on Other (the same amount when
+// both accounts have one currency), within a few days, not yet linked to an import
+// into Account.
+func findTransfer(ctx context.Context, tx *store.Tx, p findTransferParams) (int64, error) {
+	txs, err := tx.TransactionsNear(ctx, p.Other, p.Date.AddDays(-transferWindow), p.Date.AddDays(transferWindow))
 	if err != nil {
 		return 0, err
 	}
@@ -392,28 +423,255 @@ func findTransfer(ctx context.Context, tx *store.Tx, account, other int64, amoun
 		if len(t.Postings) != 2 {
 			continue
 		}
-		var mine, theirs bool
-		for _, p := range t.Postings {
-			if p.AccountID == account && p.Amount.Value.Equal(amount) {
-				mine = true
-			}
-			if p.AccountID == other && p.Amount.Value.Equal(amount.Neg()) {
-				theirs = true
+		var mine, theirs *core.Posting
+		for i, q := range t.Postings {
+			switch q.AccountID {
+			case p.Account:
+				mine = &t.Postings[i]
+			case p.Other:
+				theirs = &t.Postings[i]
 			}
 		}
-		if !mine || !theirs {
+		if mine == nil || theirs == nil || !mine.Amount.Value.Equal(p.Amount) || theirs.Amount.Value.Sign() != -p.Amount.Sign() {
 			continue
 		}
-		used, err := tx.ImportedInto(ctx, account, t.ID)
+		if theirs.Amount.Currency == mine.Amount.Currency && !theirs.Amount.Value.Equal(p.Amount.Neg()) {
+			continue
+		}
+		used, err := tx.ImportedInto(ctx, p.Account, t.ID)
 		if err != nil {
 			return 0, err
 		}
 		// Of several equal transfers, the closest date is the most likely pair.
-		if days := t.Date.DaysApart(date); !used && (best == 0 || days < bestDays) {
+		if days := t.Date.DaysApart(p.Date); !used && (best == 0 || days < bestDays) {
 			best, bestDays = t.ID, days
 		}
 	}
 	return best, nil
+}
+
+type crossTransferParams struct {
+	Acct        core.Account // the account the file belongs to
+	Batch       int64
+	DryRun      bool
+	Fingerprint string
+	Index       *core.PriceIndex
+	Row         importers.Row
+	Tags        []string
+	Target      core.Account // the account the rule points to, in another currency
+	Tree        *core.Tree
+}
+
+// importCrossTransfer imports a row that is a transfer to an account in another
+// currency. Such a transfer needs both amounts, and each export has only one. The
+// row is linked to a transfer already recorded, or completes a row waiting from the
+// other account's export, or waits itself. It returns the row's status.
+func (a *App) importCrossTransfer(ctx context.Context, tx *store.Tx, p crossTransferParams) (string, error) {
+	r := p.Row
+	txID, err := findTransfer(ctx, tx, findTransferParams{Account: p.Acct.ID, Amount: r.Amount, Date: r.Date, Other: p.Target.ID})
+	if err != nil {
+		return "", err
+	}
+	mine := store.TransferRow{Account: p.Acct.ID, Amount: core.NewAmount(r.Amount, p.Acct.Currency), Date: r.Date,
+		Note: r.Memo, Payee: r.Payee, Tags: p.Tags, Target: p.Target.ID}
+	var other *store.TransferRow
+	if txID == 0 {
+		if other, err = pairFor(ctx, tx, p.Index, mine); err != nil {
+			return "", err
+		}
+	}
+	status := "waiting"
+	switch {
+	case txID != 0:
+		status = "matched"
+	case other != nil:
+		status = "paired"
+	}
+	if p.DryRun {
+		return status, nil
+	}
+	rowID, err := tx.InsertImportedRow(ctx, store.ImportedRow{AccountID: p.Acct.ID, BatchID: p.Batch, Fingerprint: p.Fingerprint,
+		Line: r.Line, Matched: txID != 0, Raw: r.Raw, TransactionID: txID})
+	if err != nil {
+		return "", err
+	}
+	switch status {
+	case "waiting":
+		mine.ImportRowID = rowID
+		return status, tx.InsertTransferRow(ctx, mine)
+	case "paired":
+		id, err := insertTx(ctx, tx, p.Tree, transferTx(mine, *other))
+		if err != nil {
+			return "", err
+		}
+		if err := tx.LinkImportRow(ctx, rowID, id, false); err != nil {
+			return "", err
+		}
+		return status, tx.LinkImportRow(ctx, other.ImportRowID, id, true)
+	}
+	return status, nil
+}
+
+// counterparts returns the waiting rows that could be the other side of row: from
+// the account it points to, pointing back, in the other direction, within a few days.
+func counterparts(waiting []store.TransferRow, row store.TransferRow) []store.TransferRow {
+	var out []store.TransferRow
+	for _, w := range waiting {
+		if w.Account == row.Target && w.Target == row.Account && w.Amount.Value.Sign() == -row.Amount.Value.Sign() &&
+			w.Date.DaysApart(row.Date) <= transferWindow {
+			out = append(out, w)
+		}
+	}
+	return out
+}
+
+// pairFor returns the one waiting row whose amount fits row's amount at the stored
+// exchange rate. Without a rate, or with more than one that fits, it returns nil:
+// the rows wait, and the user completes them in review.
+func pairFor(ctx context.Context, tx *store.Tx, ix *core.PriceIndex, row store.TransferRow) (*store.TransferRow, error) {
+	waiting, err := tx.WaitingTransfers(ctx)
+	if err != nil {
+		return nil, err
+	}
+	have := row.Amount.Value.Abs()
+	var fits []store.TransferRow
+	for _, w := range counterparts(waiting, row) {
+		want, err := ix.Convert(w.Amount.Value.Abs(), w.Amount.Currency, row.Amount.Currency, row.Date)
+		if err != nil {
+			continue
+		}
+		if want.Sub(have).Abs().LessThanOrEqual(have.Mul(rateTolerance)) {
+			fits = append(fits, w)
+		}
+	}
+	if len(fits) != 1 {
+		return nil, nil
+	}
+	return &fits[0], nil
+}
+
+// transferTx builds one transaction from the two sides of a transfer between
+// currencies. The side the money leaves gives the date, payee and note, and its
+// amount is the cost of the other side, which also records the rate you got.
+func transferTx(a, b store.TransferRow) core.Transaction {
+	out, in := a, b
+	if out.Amount.Value.Sign() > 0 {
+		out, in = b, a
+	}
+	cost := core.Amount{Currency: out.Amount.Currency, Value: out.Amount.Value.Neg()}
+	return core.Transaction{
+		Date:  out.Date,
+		Kind:  core.KindNormal,
+		Note:  out.Note,
+		Payee: out.Payee,
+		Postings: []core.Posting{
+			{AccountID: out.Account, Amount: out.Amount},
+			{AccountID: in.Account, Amount: in.Amount, Cost: &cost},
+		},
+		Tags: append(append([]string{}, out.Tags...), in.Tags...),
+	}
+}
+
+// WaitingTransfer is an imported transfer between currencies that waits for its
+// other amount.
+type WaitingTransfer struct {
+	Account   string      // the account of the imported row
+	Amount    core.Amount // on Account
+	Date      core.Date
+	ID        int64
+	Payee     string
+	Suggested *core.Amount // the amount of the only waiting row from Target that could be the other side
+	Target    string
+	TargetCur core.Currency
+}
+
+// WaitingTransfers lists imported transfers between currencies that wait for the
+// other account's export, oldest first.
+func (a *App) WaitingTransfers(ctx context.Context) ([]WaitingTransfer, error) {
+	tree, err := a.st.Tree(ctx)
+	if err != nil {
+		return nil, err
+	}
+	waiting, err := a.st.WaitingTransfers(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]WaitingTransfer, 0, len(waiting))
+	for _, w := range waiting {
+		target, _ := tree.Get(w.Target)
+		item := WaitingTransfer{Account: tree.Path(w.Account), Amount: w.Amount, Date: w.Date, ID: w.ImportRowID,
+			Payee: w.Payee, Target: tree.Path(w.Target), TargetCur: target.Currency}
+		if c := counterparts(waiting, w); len(c) == 1 {
+			s := core.NewAmount(c[0].Amount.Value.Abs(), c[0].Amount.Currency)
+			item.Suggested = &s
+		}
+		out = append(out, item)
+	}
+	return out, nil
+}
+
+// CompleteTransferParams gives the other amount of a waiting transfer.
+type CompleteTransferParams struct {
+	Amount string // on the other account, in its currency, without a sign
+	ID     int64  // the WaitingTransfer ID
+}
+
+// CompleteTransfer records a waiting transfer with the amount on the other account.
+// A waiting row from the other account with exactly that amount is the same
+// transfer, so it is linked instead of waiting on.
+func (a *App) CompleteTransfer(ctx context.Context, p CompleteTransferParams) (core.Transaction, error) {
+	var t core.Transaction
+	err := a.st.InTx(ctx, func(tx *store.Tx) error {
+		tree, err := tx.Tree(ctx)
+		if err != nil {
+			return err
+		}
+		waiting, err := tx.WaitingTransfers(ctx)
+		if err != nil {
+			return err
+		}
+		var mine *store.TransferRow
+		for i := range waiting {
+			if waiting[i].ImportRowID == p.ID {
+				mine = &waiting[i]
+			}
+		}
+		if mine == nil {
+			return fmt.Errorf("transfer %d is not waiting. See: moolah review --list", p.ID)
+		}
+		target, _ := tree.Get(mine.Target)
+		v, err := parseAmount(p.Amount, target.Currency)
+		if err != nil {
+			return err
+		}
+		if v.Sign() <= 0 {
+			return fmt.Errorf("give the amount on %s as a positive number", tree.Path(target.ID))
+		}
+		if mine.Amount.Value.Sign() > 0 {
+			v = v.Neg()
+		}
+		other := store.TransferRow{Account: target.ID, Amount: core.NewAmount(v, target.Currency), Date: mine.Date, Target: mine.Account}
+		var twin *store.TransferRow
+		for _, c := range counterparts(waiting, *mine) {
+			if c.Amount.Value.Equal(v) {
+				twin = &c
+				other = c
+				break
+			}
+		}
+		t = transferTx(*mine, other)
+		if t.ID, err = insertTx(ctx, tx, tree, t); err != nil {
+			return err
+		}
+		if err := tx.LinkImportRow(ctx, mine.ImportRowID, t.ID, false); err != nil {
+			return err
+		}
+		if twin != nil {
+			return tx.LinkImportRow(ctx, twin.ImportRowID, t.ID, true)
+		}
+		return nil
+	})
+	return t, err
 }
 
 func (a *App) importAccount(ctx context.Context, tx *store.Tx, tree *core.Tree, name, profile string) (core.Account, error) {
@@ -719,6 +977,7 @@ type ReconcileResult struct {
 	Duplicates [][2]RegisterRow
 	Recent     []RegisterRow
 	Statement  core.Amount
+	Waiting    []WaitingTransfer // imported transfers on this account that are not recorded yet
 }
 
 // Reconcile compares the account's balance on a date with the statement. When they
@@ -748,6 +1007,15 @@ func (a *App) Reconcile(ctx context.Context, p ReconcileParams) (ReconcileResult
 	res.Difference = core.NewAmount(stmt.Sub(book), acct.Currency)
 	if res.Difference.Value.IsZero() {
 		return res, nil
+	}
+	waiting, err := a.WaitingTransfers(ctx)
+	if err != nil {
+		return res, err
+	}
+	for _, w := range waiting {
+		if w.Account == tree.Path(acct.ID) && !w.Date.After(date) {
+			res.Waiting = append(res.Waiting, w)
+		}
 	}
 	reg, err := a.Register(ctx, RegisterParams{Account: tree.Path(acct.ID), To: date})
 	if err != nil {

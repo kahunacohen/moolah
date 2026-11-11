@@ -1,0 +1,48 @@
+$ moolah init --base EUR --no-backup-key
+Book "main" is ready in $TMP/data/books/main.db (base currency EUR).
+Next: add your accounts, for example:
+  moolah account add assets:bank:mybank --currency EUR --opening 1000
+  moolah category list
+
+$ moolah account add assets:bank:checking --currency EUR --opening 5000 --date 2026-10-31
+Added assets:bank:checking (EUR).
+
+$ moolah account add liabilities:card:chase --currency USD
+Added liabilities:card:chase (USD).
+
+$ moolah rule add chase liabilities:card:chase
+Added rule 1.
+
+$ moolah rule add thank assets:bank:checking
+Added rule 2.
+
+$ moolah import $TMP/bank.csv --account checking
+Imported $TMP/bank.csv into assets:bank:checking with profile generic-csv: 0 new.
+1 transfer to an account in another currency waits for the other account's export, which has the other amount.
+Import it, or give the amount with: moolah review
+Import ID 1 (undo with: moolah import undo 1).
+
+$ moolah import $TMP/card.csv --account chase
+Imported $TMP/card.csv into liabilities:card:chase with profile generic-csv: 0 new.
+1 transfer to an account in another currency waits for the other account's export, which has the other amount.
+Import it, or give the amount with: moolah review
+Import ID 2 (undo with: moolah import undo 2).
+
+$ moolah review
+2 transfers between currencies wait for the other amount. Import the other account's file,
+or give the amount with: moolah review transfer <id> <amount>
+
+ID  Date        Payee              Account                        Amount  To                          Probably
+ 1  2026-11-02  CHASE PAYMENT      assets:bank:checking    -1,100.00 EUR  liabilities:card:chase  1,200.00 USD
+ 2  2026-11-04  PAYMENT THANK YOU  liabilities:card:chase   1,200.00 USD  assets:bank:checking    1,100.00 EUR
+
+$ moolah review transfer 1 1200
+Recorded transaction 2.
+
+$ moolah review
+Nothing to review: every transaction has a category.
+
+$ moolah register chase
+ID  Date        Payee          Other side                  Amount       Balance
+ 2  2026-11-02  CHASE PAYMENT  assets:bank:checking  1,200.00 USD  1,200.00 USD
+

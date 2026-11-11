@@ -39,6 +39,10 @@ INSERT INTO rules (position, pattern, account_id) VALUES (1, 'cafe', 4);
 	4: `
 INSERT INTO rate_sources (name, toml) VALUES ('my-source', 'name = "my-source"');
 `,
+	5: `
+INSERT INTO import_rows (id, batch_id, account_id, fingerprint, line, raw) VALUES (2, 1, 2, 'def', 3, '2026-01-06,Card payment,-100.00');
+INSERT INTO transfer_rows (import_row_id, target_id, date, amount, payee) VALUES (2, 4, '2026-01-06', -10000, 'Card payment');
+`,
 }
 
 // bookAtVersion writes a book as moolah at that schema version left it, with test data.

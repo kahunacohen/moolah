@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"moolah/core"
 )
 
 func csvFile(t *testing.T, lines ...string) string {
@@ -210,6 +212,128 @@ func TestReviewAndReconcile(t *testing.T) {
 		res := importOK(t, a, ImportParams{File: csvFile(t, "05/10/2026,Coffee,-12"), Account: "leumi"})
 		if res.Rows[0].Date.String() != "2026-10-05" {
 			t.Fatalf("user profile not used: %+v", res.Rows[0])
+		}
+	})
+}
+
+// crossBook is a book with an ILS bank account, a USD card, and rules that make the
+// card payment a transfer in both exports.
+func crossBook(t *testing.T, rate string) *App {
+	t.Helper()
+	a := newBook(t)
+	if rate != "" {
+		mustDo(t, func() error {
+			_, err := a.AddPrice(ctx, PriceParams{Base: "USD", Date: core.MustDate("2026-10-01"), Quote: "ILS", Rate: rate})
+			return err
+		})
+	}
+	mustDo(t, func() error {
+		_, _, err := a.AddRule(ctx, RuleParams{Pattern: "chase payment", Account: "liabilities:card:chase"})
+		return err
+	})
+	mustDo(t, func() error {
+		_, _, err := a.AddRule(ctx, RuleParams{Pattern: "payment thank you", Account: "assets:bank:leumi"})
+		return err
+	})
+	return a
+}
+
+func waitingCount(t *testing.T, a *App) int {
+	t.Helper()
+	w, err := a.WaitingTransfers(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return len(w)
+}
+
+func TestCrossCurrencyTransfers(t *testing.T) {
+	bankFile := func(t *testing.T) string { return csvFile(t, "2026-10-05,Chase payment,-3700") }
+	cardFile := func(t *testing.T, amount string) string {
+		return csvFile(t, "2026-10-07,Payment thank you,"+amount)
+	}
+
+	// Each export has only one of the two amounts, so the first row waits and the
+	// second completes it: one transaction with both amounts, in either order.
+	t.Run("first side waits, second side completes it", func(t *testing.T) {
+		a := crossBook(t, "3.70")
+		res := importOK(t, a, ImportParams{File: bankFile(t), Account: "leumi"})
+		if res.Waiting != 1 || waitingCount(t, a) != 1 {
+			t.Fatalf("bank import %+v", res)
+		}
+		res = importOK(t, a, ImportParams{File: cardFile(t, "1000"), Account: "chase"})
+		if res.Paired != 1 || waitingCount(t, a) != 0 {
+			t.Fatalf("card import %+v", res)
+		}
+		reg, err := a.Register(ctx, RegisterParams{Account: "chase"})
+		if err != nil || len(reg.Rows) != 1 || reg.Rows[0].Amount.String() != "1,000.00 USD" || reg.Rows[0].Date.String() != "2026-10-05" {
+			t.Fatalf("card register %+v %v", reg.Rows, err)
+		}
+		bal, err := a.Balances(ctx, BalanceParams{})
+		if err != nil || row(t, bal, "assets:bank:leumi").Native.String() != "21,300.00 ILS" {
+			t.Fatalf("bank balance %v", err)
+		}
+	})
+
+	// An amount that does not fit the exchange rate is not the same transfer.
+	t.Run("amount far from the rate is not paired", func(t *testing.T) {
+		a := crossBook(t, "3.70")
+		importOK(t, a, ImportParams{File: bankFile(t), Account: "leumi"})
+		res := importOK(t, a, ImportParams{File: cardFile(t, "1200"), Account: "chase"})
+		if res.Paired != 0 || waitingCount(t, a) != 2 {
+			t.Fatalf("got %+v", res)
+		}
+	})
+
+	// Without a rate nothing is guessed. Review offers the other side's amount, and
+	// completing one side also links the other, so the transfer is recorded once.
+	t.Run("without a rate both wait and review completes them", func(t *testing.T) {
+		a := crossBook(t, "")
+		importOK(t, a, ImportParams{File: bankFile(t), Account: "leumi"})
+		importOK(t, a, ImportParams{File: cardFile(t, "1000"), Account: "chase"})
+		waiting, err := a.WaitingTransfers(ctx)
+		if err != nil || len(waiting) != 2 || waiting[0].Suggested == nil || waiting[0].Suggested.String() != "1,000.00 USD" {
+			t.Fatalf("waiting %+v %v", waiting, err)
+		}
+		tx, err := a.CompleteTransfer(ctx, CompleteTransferParams{ID: waiting[0].ID, Amount: "1000"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if waitingCount(t, a) != 0 || len(tx.Postings) != 2 {
+			t.Fatalf("still waiting, or %+v", tx)
+		}
+		reg, _ := a.Register(ctx, RegisterParams{Account: "chase"})
+		if len(reg.Rows) != 1 {
+			t.Fatalf("%d transactions on the card", len(reg.Rows))
+		}
+	})
+
+	// Undoing the import that completed a transfer removes it, and the other side waits again.
+	t.Run("undo makes the other side wait again", func(t *testing.T) {
+		a := crossBook(t, "3.70")
+		importOK(t, a, ImportParams{File: bankFile(t), Account: "leumi"})
+		res := importOK(t, a, ImportParams{File: cardFile(t, "1000"), Account: "chase"})
+		if _, err := a.UndoImport(ctx, res.Batch); err != nil {
+			t.Fatal(err)
+		}
+		reg, _ := a.Register(ctx, RegisterParams{Account: "chase"})
+		if len(reg.Rows) != 0 || waitingCount(t, a) != 1 {
+			t.Fatalf("%d card transactions, %d waiting", len(reg.Rows), waitingCount(t, a))
+		}
+	})
+
+	// A transfer typed by hand with both amounts is found by both imports, so nothing is added.
+	t.Run("transfer entered by hand is matched from both sides", func(t *testing.T) {
+		a := crossBook(t, "")
+		mustDo(t, func() error {
+			_, err := a.Transfer(ctx, TransferParams{From: "leumi", To: "chase", Amount: "3700", ToAmount: "1000",
+				TxInfo: TxInfo{Date: core.MustDate("2026-10-05")}})
+			return err
+		})
+		bank := importOK(t, a, ImportParams{File: bankFile(t), Account: "leumi"})
+		card := importOK(t, a, ImportParams{File: cardFile(t, "1000"), Account: "chase"})
+		if bank.Matched != 1 || card.Matched != 1 || waitingCount(t, a) != 0 {
+			t.Fatalf("bank %+v card %+v", bank, card)
 		}
 	})
 }

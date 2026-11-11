@@ -204,6 +204,31 @@ func TestImportScenario(t *testing.T) {
 		s.run("register leumi")
 		s.golden("import")
 	})
+	// A card payment between two currencies: each export has one amount, so the first
+	// side waits and is completed in review (here without a rate, so nothing is guessed).
+	t.Run("transfer between currencies", func(t *testing.T) {
+		s := newSession(t)
+		dir := filepath.Dir(s.env.DataDir)
+		write := func(name, text string) {
+			if err := os.WriteFile(filepath.Join(dir, name), []byte(text), 0o600); err != nil {
+				t.Fatal(err)
+			}
+		}
+		write("bank.csv", "Date,Description,Amount\n2026-11-02,CHASE PAYMENT,-1100.00\n")
+		write("card.csv", "Date,Description,Amount\n2026-11-04,PAYMENT THANK YOU,1200.00\n")
+		s.run("init --base EUR --no-backup-key")
+		s.run("account add assets:bank:checking --currency EUR --opening 5000 --date 2026-10-31")
+		s.run("account add liabilities:card:chase --currency USD")
+		s.run("rule add chase liabilities:card:chase")
+		s.run("rule add thank assets:bank:checking")
+		s.run("import " + filepath.Join(dir, "bank.csv") + " --account checking")
+		s.run("import " + filepath.Join(dir, "card.csv") + " --account chase")
+		s.run("review")
+		s.run("review transfer 1 1200")
+		s.run("review")
+		s.run("register chase")
+		s.golden("import-currencies")
+	})
 }
 
 func TestSyncScenario(t *testing.T) {

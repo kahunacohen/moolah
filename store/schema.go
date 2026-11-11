@@ -161,6 +161,21 @@ CREATE TABLE rate_sources (
 	updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))
 );
 ` + changeCounter("prices", "rate_sources"),
+	// v5: an imported transfer between accounts in two currencies needs the amount
+	// from both exports. This keeps one side until the other arrives. A row is
+	// waiting while its import row has no transaction.
+	`
+CREATE TABLE transfer_rows (
+	import_row_id INTEGER PRIMARY KEY REFERENCES import_rows(id) ON DELETE CASCADE,
+	target_id     INTEGER NOT NULL REFERENCES accounts(id),
+	date          TEXT NOT NULL,
+	amount        INTEGER NOT NULL,
+	payee         TEXT NOT NULL DEFAULT '',
+	note          TEXT NOT NULL DEFAULT '',
+	tags          TEXT NOT NULL DEFAULT ''
+);
+CREATE INDEX transfer_rows_target ON transfer_rows(target_id);
+` + changeCounter("transfer_rows"),
 }
 
 // changeCounter adds triggers that increase meta.change_seq on every write to the

@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -221,6 +222,37 @@ func TestPages(t *testing.T) {
 			t.Fatalf("code %d body %s", w.Code, w.Body)
 		}
 	})
+}
+
+// The review page shows imported transfers between currencies and records one with
+// the amount entered for the other account.
+func TestReviewTransfer(t *testing.T) {
+	s, a := newServer(t)
+	if _, err := a.AddAccount(context.Background(), app.AddAccountParams{Path: "liabilities:card:chase", Currency: "USD"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := a.AddRule(context.Background(), app.RuleParams{Pattern: "chase", Account: "liabilities:card:chase"}); err != nil {
+		t.Fatal(err)
+	}
+	file := filepath.Join(t.TempDir(), "bank.csv")
+	if err := os.WriteFile(file, []byte("Date,Description,Amount\n2026-11-02,CHASE PAYMENT,-370\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := a.Import(context.Background(), app.ImportParams{File: file, Account: "leumi"}); err != nil {
+		t.Fatal(err)
+	}
+	if w := s.do(t, req{path: "/review", cookie: true}); w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "/review/transfer/1") {
+		t.Fatalf("code %d: waiting transfer not shown", w.Code)
+	}
+	if w := s.do(t, req{method: "POST", path: "/review/transfer/1", cookie: true, csrf: true, form: url.Values{"amount": {"-5"}}}); w.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("negative amount: %d", w.Code)
+	}
+	if w := s.do(t, req{method: "POST", path: "/review/transfer/1", cookie: true, csrf: true, form: url.Values{"amount": {"100"}}}); w.Code != http.StatusSeeOther {
+		t.Fatalf("code %d %s", w.Code, w.Body)
+	}
+	if waiting, _ := a.WaitingTransfers(context.Background()); len(waiting) != 0 {
+		t.Fatal("transfer still waiting")
+	}
 }
 
 func itoa(n int64) string { return strconv.FormatInt(n, 10) }

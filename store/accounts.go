@@ -100,6 +100,7 @@ func (q Q) MovePostings(ctx context.Context, from, to int64) error {
 		"UPDATE postings SET account_id = ? WHERE account_id = ?",
 		"UPDATE rules SET account_id = ? WHERE account_id = ?",
 		"UPDATE import_rows SET account_id = ? WHERE account_id = ?",
+		"UPDATE transfer_rows SET target_id = ? WHERE target_id = ?",
 		"UPDATE import_batches SET account_id = ? WHERE account_id = ?",
 		"UPDATE OR IGNORE profile_accounts SET account_id = ? WHERE account_id = ?",
 	} {

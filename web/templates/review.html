@@ -1,5 +1,31 @@
 {{define "content"}}
 <h1>{{.T "review.title"}}</h1>
+{{if .Data.Error}}<div class="msg err">{{.Data.Error}}</div>{{end}}
+{{if .Data.Waiting}}
+<h2>{{.T "review.waiting"}}</h2>
+<p class="muted">{{.T "review.waiting.help"}}</p>
+<table>
+<tr><th>{{.T "date"}}</th><th>{{.T "payee"}}</th><th>{{.T "account"}}</th><th class="num">{{.T "amount"}}</th><th>{{.T "review.waiting.to"}}</th></tr>
+{{range .Data.Waiting}}
+<tr>
+  <td class="num">{{.Date}}</td>
+  <td>{{.Payee}}</td>
+  <td class="muted">{{.Account}}</td>
+  <td class="num {{if lt .Amount.Value.Sign 0}}neg{{end}}">{{.Amount}}</td>
+  <td>
+    <form method="post" action="/review/transfer/{{.ID}}" class="inline tight">
+      <input type="hidden" name="csrf" value="{{$.CSRF}}">
+      {{.Target}}
+      <input name="amount" inputmode="decimal" required autocomplete="off" size="10"{{if .Suggested}} value="{{.Suggested.Value.String}}"{{end}}> {{.TargetCur}}
+      <button>{{$.T "save"}}</button>
+    </form>
+    {{if .Suggested}}<div class="muted">{{$.T "review.waiting.probably"}} {{.Suggested}}</div>{{end}}
+  </td>
+</tr>
+{{end}}
+</table>
+<h2>{{.T "review.categories"}}</h2>
+{{end}}
 {{if not .Data.Items}}<p class="muted">{{.T "review.none"}}</p>{{else}}
 <table>
 <tr><th>{{.T "date"}}</th><th>{{.T "payee"}}</th><th>{{.T "account"}}</th><th class="num">{{.T "amount"}}</th><th>{{.T "category"}}</th></tr>

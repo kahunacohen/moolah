@@ -100,3 +100,11 @@ func count(n int, singular, plural string) string {
 	}
 	return fmt.Sprintf("%d %s", n, plural)
 }
+
+// plural returns singular when n is 1, else plural: a verb that agrees with count.
+func plural(n int, singular, plural string) string {
+	if n == 1 {
+		return singular
+	}
+	return plural
+}

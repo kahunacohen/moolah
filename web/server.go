@@ -150,6 +150,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /categories", s.locked(s.categoriesPost))
 	mux.HandleFunc("GET /review", s.locked(s.review))
 	mux.HandleFunc("POST /review/{id}", s.locked(s.reviewPost))
+	mux.HandleFunc("POST /review/transfer/{id}", s.locked(s.reviewTransfer))
 	mux.HandleFunc("GET /reports", s.locked(s.reports))
 	mux.HandleFunc("GET /import", s.locked(s.importForm))
 	mux.HandleFunc("POST /import", s.locked(s.importPost))
@@ -289,6 +290,9 @@ func (s *Server) newPage(r *http.Request, nav, title string) page {
 	}
 	if items, err := s.app.Review(ctx); err == nil {
 		p.ReviewCount = len(items)
+		if waiting, err := s.app.WaitingTransfers(ctx); err == nil {
+			p.ReviewCount += len(waiting)
+		}
 	}
 	if msg := r.URL.Query().Get("ok"); msg != "" {
 		p.Flash = p.T(msg)

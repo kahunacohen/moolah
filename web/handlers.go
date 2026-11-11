@@ -425,12 +425,23 @@ func (s *Server) categoriesPost(w http.ResponseWriter, r *http.Request) {
 
 type reviewData struct {
 	Categories []string
+	Error      string // from completing a transfer
 	Items      []app.ReviewItem
+	Waiting    []app.WaitingTransfer
 }
 
 func (s *Server) review(w http.ResponseWriter, r *http.Request) {
+	s.renderReview(w, r, "")
+}
+
+func (s *Server) renderReview(w http.ResponseWriter, r *http.Request, errMsg string) {
 	p := s.newPage(r, "review", "review.title")
 	items, err := s.app.Review(r.Context())
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	waiting, err := s.app.WaitingTransfers(r.Context())
 	if err != nil {
 		s.fail(w, r, err)
 		return
@@ -440,7 +451,25 @@ func (s *Server) review(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, err)
 		return
 	}
-	s.render(w, "review", withData(p, reviewData{Categories: cats, Items: items}))
+	if errMsg != "" {
+		w.WriteHeader(http.StatusUnprocessableEntity)
+	}
+	s.render(w, "review", withData(p, reviewData{Categories: cats, Error: errMsg, Items: items, Waiting: waiting}))
+}
+
+// reviewTransfer completes a waiting transfer between currencies with the amount on the other account.
+func (s *Server) reviewTransfer(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	if _, err := s.app.CompleteTransfer(r.Context(), app.CompleteTransferParams{ID: id, Amount: strings.TrimSpace(r.FormValue("amount"))}); err != nil {
+		s.renderReview(w, r, err.Error())
+		return
+	}
+	s.changed()
+	redirect(w, r, "/review", "saved")
 }
 
 // reviewPost sets a category and returns the updated table row (for htmx).

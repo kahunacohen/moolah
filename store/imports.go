@@ -94,15 +94,77 @@ type ImportedRow struct {
 	TransactionID int64
 }
 
-// InsertImportedRow stores an imported row.
-func (q Q) InsertImportedRow(ctx context.Context, r ImportedRow) error {
+// InsertImportedRow stores an imported row and returns its ID.
+func (q Q) InsertImportedRow(ctx context.Context, r ImportedRow) (int64, error) {
 	raw, err := json.Marshal(r.Raw)
+	if err != nil {
+		return 0, err
+	}
+	res, err := q.q.ExecContext(ctx, `INSERT INTO import_rows (batch_id, account_id, fingerprint, line, raw, transaction_id, matched)
+		VALUES (?, ?, ?, ?, ?, ?, ?)`, r.BatchID, r.AccountID, r.Fingerprint, r.Line, string(raw), nullID(r.TransactionID), boolInt(r.Matched))
+	if err != nil {
+		return 0, err
+	}
+	return res.LastInsertId()
+}
+
+// LinkImportRow sets the transaction of an imported row. matched means the
+// transaction was created for another row, so undoing this row's import keeps it.
+func (q Q) LinkImportRow(ctx context.Context, rowID, txID int64, matched bool) error {
+	_, err := q.q.ExecContext(ctx, "UPDATE import_rows SET transaction_id = ?, matched = ? WHERE id = ?", txID, boolInt(matched), rowID)
+	return err
+}
+
+// TransferRow is one side of an imported transfer between accounts in two currencies.
+type TransferRow struct {
+	Account     int64
+	Amount      core.Amount // on Account, in its currency
+	Date        core.Date
+	ImportRowID int64
+	Note        string
+	Payee       string
+	Tags        []string
+	Target      int64 // the other account, in another currency
+}
+
+// InsertTransferRow stores one side of a transfer for an imported row.
+func (q Q) InsertTransferRow(ctx context.Context, r TransferRow) error {
+	minor, err := core.ToMinor(r.Amount.Value, r.Amount.Currency)
 	if err != nil {
 		return err
 	}
-	_, err = q.q.ExecContext(ctx, `INSERT INTO import_rows (batch_id, account_id, fingerprint, line, raw, transaction_id, matched)
-		VALUES (?, ?, ?, ?, ?, ?, ?)`, r.BatchID, r.AccountID, r.Fingerprint, r.Line, string(raw), nullID(r.TransactionID), boolInt(r.Matched))
+	_, err = q.q.ExecContext(ctx, `INSERT INTO transfer_rows (import_row_id, target_id, date, amount, payee, note, tags)
+		VALUES (?, ?, ?, ?, ?, ?, ?)`, r.ImportRowID, r.Target, r.Date.String(), minor, r.Payee, r.Note, strings.Join(r.Tags, ","))
 	return err
+}
+
+// WaitingTransfers returns the transfer rows that have no transaction yet, oldest first.
+func (q Q) WaitingTransfers(ctx context.Context) ([]TransferRow, error) {
+	rows, err := q.q.QueryContext(ctx, `SELECT t.import_row_id, r.account_id, a.currency, t.target_id, t.date, t.amount, t.payee, t.note, t.tags
+		FROM transfer_rows t JOIN import_rows r ON r.id = t.import_row_id JOIN accounts a ON a.id = r.account_id
+		WHERE r.transaction_id IS NULL ORDER BY t.date, t.import_row_id`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []TransferRow
+	for rows.Next() {
+		var r TransferRow
+		var cur, date, tags string
+		var minor int64
+		if err := rows.Scan(&r.ImportRowID, &r.Account, &cur, &r.Target, &date, &minor, &r.Payee, &r.Note, &tags); err != nil {
+			return nil, err
+		}
+		if r.Date, err = core.ParseDate(date); err != nil {
+			return nil, err
+		}
+		r.Amount = core.NewAmount(core.FromMinor(minor, core.Currency(cur)), core.Currency(cur))
+		if tags != "" {
+			r.Tags = strings.Split(tags, ",")
+		}
+		out = append(out, r)
+	}
+	return out, rows.Err()
 }
 
 func boolInt(b bool) int {

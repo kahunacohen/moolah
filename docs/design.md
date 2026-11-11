@@ -4,6 +4,7 @@
 > - **moolah is not tied to a country.** The plan below was written with an Israeli user in mind, so its examples use shekels, Israeli banks and Hebrew. In the build, no country, currency, bank or rate source is hard-coded: rate sources and import profiles are TOML data, locales come from CLDR, and `init` takes its defaults from the system locale.
 > - Import profiles use flat `[columns]` keys (`amount`, `negate`, `debit`, `credit`, …) instead of inline tables. Reference: `docs/profiles.md`.
 > - Every imported row becomes a transaction at once: in its rule's category, or in `expenses:uncategorized`. `review` then changes the category, so progress is always saved.
+> - Exception: a row whose rule points to an account in another currency needs the other export's amount. It waits in `transfer_rows` until the other file pairs with it (amount within 5% of the stored rate, exactly one candidate) or the user enters the amount in `review`. The plan's "suggest, then confirm" became "pair only when certain, else ask in review".
 > - Old binary `.xls` files are not supported (CSV, XLSX and HTML-as-XLS are).
 > - No starter rules for card companies: a rule needs the user's own card account. `rule add 'max' liabilities:card:max` does it in one line.
 > - Settings: everything about a book is in its database. Only computer-specific settings (current book, sync folder and key path per book, `backup_dir`, `offline`) are in `~/.config/moolah/config.toml`. `moolah config` handles both and shows where each lives. `moolah sync keygen` creates an age key.
