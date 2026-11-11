@@ -131,6 +131,11 @@ func TestScenarios(t *testing.T) {
 		s.run("report income --month 2026-10 --depth 1")
 		s.run("report networth --from 2026-10-01 --to 2026-11-04")
 		s.run("check")
+		// Programs read CSV and JSON, so they ignore the book's number format.
+		s.run("config set locale de_DE")
+		s.run("balance --date 2026-10-31")
+		s.run("--format csv balance --date 2026-10-31")
+		s.run("--format csv register leumi")
 		s.golden("everyday")
 	})
 

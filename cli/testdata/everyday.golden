@@ -175,3 +175,42 @@ Net worth 2026-11-04   414,305.75
 $ moolah check
 No problems found.
 
+$ moolah config set locale de_DE
+Set locale.
+
+$ moolah balance --date 2026-10-31
+Balances on 2026-10-31, in ILS
+
+Account             Balance  Value (ILS)
+assets                        414.500,00
+  bank                         24.500,00
+    leumi     24.500,00 ILS    24.500,00
+  invest                      390.000,00
+    pension  390.000,00 ILS   390.000,00
+liabilities                      -156,03
+  card                           -156,03
+    chase        -42,17 USD      -156,03
+
+Net worth                     414.343,97
+
+$ moolah --format csv balance --date 2026-10-31
+Account,Balance,Balance currency,Value (ILS)
+assets,,,414500.00
+bank,,,24500.00
+leumi,24500.00,ILS,24500.00
+invest,,,390000.00
+pension,390000.00,ILS,390000.00
+liabilities,,,-156.03
+card,,,-156.03
+chase,-42.17,USD,-156.03
+,,,
+Net worth,,,414343.97
+
+$ moolah --format csv register leumi
+ID,Date,Payee,Other side,Amount,Amount currency,Balance,Balance currency
+1,2026-10-01,Opening balance,equity:opening,25000.00,ILS,25000.00,ILS
+3,2026-10-03,Shufersal,expenses:food:groceries,-200.00,ILS,24800.00,ILS
+6,2026-10-20,Super-Pharm,"expenses:health, expenses:household",-300.00,ILS,24500.00,ILS
+7,2026-11-01,Transfer,"liabilities:card:chase, expenses:fees",-1545.00,ILS,22955.00,ILS
+5,2026-11-04,,expenses:food,-85.00,ILS,22870.00,ILS
+

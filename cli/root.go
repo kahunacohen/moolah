@@ -114,7 +114,11 @@ func (g *globals) open() (*app.App, error) {
 	}
 	a.SetClock(g.env.Now)
 	a.Offline = g.offline || g.env.Offline
-	if loc, err := a.Config(context.Background(), app.KeyLocale); err == nil {
+	// Only tables for people use the book's number format; CSV and JSON are read by
+	// programs, so they always write 1234.56.
+	if g.format != "table" {
+		core.SetNumberStyle(core.NumberStyle{Decimal: "."})
+	} else if loc, err := a.Config(context.Background(), app.KeyLocale); err == nil {
 		core.SetNumberStyle(app.NumberStyleFor(loc))
 	}
 	a.Passphrase = func() (string, error) { return g.in.passphrase(false) }

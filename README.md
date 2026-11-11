@@ -397,7 +397,7 @@ Net worth 2026-01-01                    412,300 €
 Net worth 2026-10-31                    460,450 €
 ```
 
-**Output formats:** `--format table` (default), `--format csv`, `--format json`. Use CSV or JSON to process the data with other tools.
+**Output formats:** `--format table` (default), `--format csv`, `--format json`. Use CSV or JSON to process the data with other tools. They always write numbers as `1234.56`, whatever your language setting. In CSV, a column of amounts becomes two columns, the number and its currency, so a spreadsheet can add them up.
 
 ## Reconciling with a statement
 
