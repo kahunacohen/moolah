@@ -84,7 +84,7 @@ func newRoot(g *globals) *cobra.Command {
 	root.AddCommand(
 		initCmd(g), bookCmd(g), accountCmd(g), categoryCmd(g), tagCmd(g),
 		addCmd(g), transferCmd(g), registerCmd(g), balanceCmd(g), valueCmd(g),
-		priceCmd(g), configCmd(g), backupCmd(g), restoreCmd(g), checkCmd(g),
+		configCmd(g), backupCmd(g), restoreCmd(g), checkCmd(g),
 		editCmd(g), deleteCmd(g), syncCmd(g),
 	)
 	for _, c := range extraCommands {

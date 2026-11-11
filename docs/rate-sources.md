@@ -3,12 +3,12 @@
 moolah downloads exchange rates only from **rate sources**: small TOML files that describe a public rates API. No source is built into the code. The sources that ship with moolah are TOML files in `prices/sources/`, and you can add your own the same way. Your sources are stored in your book, so backups and sync include them.
 
 ```sh
-moolah source list                       # all sources; * = used
-moolah source show ecb > my-source.toml  # a starting point
-moolah source add my-source.toml         # checks it and saves it
-moolah source test my-source USD CAD     # downloads a week of rates, saves nothing
-moolah source edit my-source             # change it in $EDITOR
-moolah source remove my-source
+moolah rates source list                       # all sources; * = used
+moolah rates source show ecb > my-source.toml  # a starting point
+moolah rates source add my-source.toml         # checks it and saves it
+moolah rates source test my-source USD CAD     # downloads a week of rates, saves nothing
+moolah rates source edit my-source             # change it in $EDITOR
+moolah rates source remove my-source
 ```
 
 ## Which source is used
@@ -17,7 +17,7 @@ For every currency your book uses, moolah needs its rate **into the report curre
 
 1. moolah tries the sources in order, and uses the first one that publishes the pair.
 2. If no source publishes the pair, it looks for a currency that both sides can be converted to, and downloads two rates. Reports then combine them into a cross rate.
-3. If that also fails, the error names the pair. Add rates by hand with `moolah price add` or `moolah price import`, or add a source.
+3. If that also fails, the error names the pair. Add rates by hand with `moolah rates add` or `moolah rates import`, or add a source.
 
 **Order:** set it with `moolah config set rate_sources name1,name2`. Only the listed sources are used. Without the setting, moolah uses all sources: first those that publish against your base currency (usually your country's central bank), then those that publish any pair, then the rest. On the same day, a rate from an earlier source wins over a later one. Any downloaded rate wins over a manual rate, and a manual rate wins over a rate taken from your own transactions.
 
@@ -37,7 +37,7 @@ Unknown keys are errors.
 | Key | Meaning |
 |---|---|
 | `name` | **required.** Lower-case letters, digits, `-` and `_`. `manual` and `tx` are reserved. |
-| `description` | Shown in `moolah source list`. |
+| `description` | Shown in `moolah rates source list`. |
 | `currencies` | **required.** ISO codes the source publishes. |
 | `quote` | When set, the source publishes only rates **into** this currency (`X → quote` for each X in `currencies`). Without it, it publishes any pair among `currencies`. |
 | `url` | **required.** The address, with placeholders `{base}`, `{quote}`, `{from}`, `{to}` (dates as `YYYY-MM-DD`). One request returns the daily rates of one pair for a date range. |

@@ -166,7 +166,13 @@ func leaf(path string, depth int) string {
 }
 
 func ratesCmd(g *globals) *cobra.Command {
-	cmd := &cobra.Command{Use: "rates", Short: "Download exchange rates from the rate sources (see: moolah source list)"}
+	cmd := &cobra.Command{
+		Use:   "rates",
+		Short: "Exchange rates: download, enter and list them, and manage where they come from",
+		Long: "moolah converts amounts with daily exchange rates stored in the book. It downloads them\n" +
+			"from rate sources (moolah rates source list) when a report needs them, or with\n" +
+			"moolah rates fetch. Rates you enter with add or import are used when no source has one.",
+	}
 	var in string
 	fetch := &cobra.Command{
 		Use: "fetch", Short: "Download missing daily rates for the currencies this book uses", Args: cobra.NoArgs,
@@ -193,6 +199,7 @@ func ratesCmd(g *globals) *cobra.Command {
 		},
 	}
 	fetch.Flags().StringVar(&in, "in", "", "download rates into this currency (default: your base currency)")
-	cmd.AddCommand(fetch)
+	cmd.AddCommand(fetch, sourceCmd(g))
+	cmd.AddCommand(storedRateCmds(g)...)
 	return cmd
 }

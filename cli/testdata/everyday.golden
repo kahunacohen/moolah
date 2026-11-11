@@ -52,10 +52,10 @@ Added transaction 8 on 2026-02-10:
 $ moolah value pension 390000 --date 2026-10-31
 Booked a gain of 7,600.00 ILS (balance was 382,400.00 ILS). Transaction 9.
 
-$ moolah price add 2026-10-01 USD ILS 3.70
+$ moolah rates add 2026-10-01 USD ILS 3.70
 Saved 1 USD = 3.7 ILS on 2026-10-01.
 
-$ moolah price add 2026-11-02 USD ILS 3.80
+$ moolah rates add 2026-11-02 USD ILS 3.80
 Saved 1 USD = 3.8 ILS on 2026-11-02.
 
 $ moolah balance --date 2026-10-31

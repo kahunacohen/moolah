@@ -157,7 +157,7 @@ func TestPlanLegs(t *testing.T) {
 	// A currency that no source publishes is reported, with how to add rates by hand.
 	t.Run("unpublished currency reported", func(t *testing.T) {
 		_, missing := planLegs([]prices.Fetcher{world}, []core.Currency{"NGN"}, "USD", []core.Currency{"EUR"})
-		if len(missing) != 1 || !strings.Contains(missing[0], "price add") {
+		if len(missing) != 1 || !strings.Contains(missing[0], "rates add") {
 			t.Fatalf("missing %v", missing)
 		}
 	})

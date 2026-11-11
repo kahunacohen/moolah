@@ -35,7 +35,7 @@ type MissingRateError struct {
 }
 
 func (e *MissingRateError) Error() string {
-	return fmt.Sprintf("no %s→%s rate on or before %s. Add one with: moolah price add %s %s %s <rate>",
+	return fmt.Sprintf("no %s→%s rate on or before %s. Add one with: moolah rates add %s %s %s <rate>",
 		e.From, e.To, e.Date, e.Date, e.From, e.To)
 }
 

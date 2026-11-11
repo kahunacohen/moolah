@@ -15,12 +15,11 @@ import (
 	"moolah/crypt"
 )
 
-func priceCmd(g *globals) *cobra.Command {
-	cmd := &cobra.Command{Use: "price", Short: "Exchange rates"}
-
+// storedRateCmds are the "rates" subcommands for rates stored in the book.
+func storedRateCmds(g *globals) []*cobra.Command {
 	add := &cobra.Command{
-		Use: "add <date> <from> <to> <rate>", Short: "Enter a rate: 1 <from> = <rate> <to>", Args: cobra.ExactArgs(4),
-		Example: "  moolah price add 2026-10-31 USD EUR 0.92",
+		Use: "add <date> <from> <to> <rate>", Short: "Enter a rate by hand: 1 <from> = <rate> <to>", Args: cobra.ExactArgs(4),
+		Example: "  moolah rates add 2026-10-31 USD EUR 0.92",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			d, err := core.ParseDate(args[0])
 			if err != nil {
@@ -60,7 +59,7 @@ func priceCmd(g *globals) *cobra.Command {
 	}
 
 	list := &cobra.Command{
-		Use: "list [currency]", Short: "List stored rates", Args: cobra.MaximumNArgs(1),
+		Use: "list [currency]", Short: "List the rates stored in the book", Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cur := ""
 			if len(args) == 1 {
@@ -88,8 +87,7 @@ func priceCmd(g *globals) *cobra.Command {
 			})
 		},
 	}
-	cmd.AddCommand(add, imp, list)
-	return cmd
+	return []*cobra.Command{add, imp, list}
 }
 
 func readPriceCSV(r io.Reader) ([]app.PriceParams, error) {

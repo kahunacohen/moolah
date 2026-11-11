@@ -89,7 +89,7 @@ func (a *App) sources(ctx context.Context) ([]prices.Fetcher, error) {
 		for _, n := range splitList(setting) {
 			s, ok := all[n]
 			if !ok {
-				return nil, fmt.Errorf("rate_sources names %q, which does not exist. See: moolah source list", n)
+				return nil, fmt.Errorf("rate_sources names %q, which does not exist. See: moolah rates source list", n)
 			}
 			out = append(out, s)
 		}
@@ -217,7 +217,7 @@ func planLegs(srcs []prices.Fetcher, need []core.Currency, quote core.Currency, 
 			}
 		}
 		if !found {
-			missing = append(missing, fmt.Sprintf("no rate source publishes %s→%s (add rates with moolah price add, or a source with moolah source add)", c, quote))
+			missing = append(missing, fmt.Sprintf("no rate source publishes %s→%s (add rates with moolah rates add, or a source with moolah rates source add)", c, quote))
 		}
 	}
 	return legs, missing
@@ -230,7 +230,7 @@ func (a *App) FetchRates(ctx context.Context, quote core.Currency) (FetchResult,
 	var res FetchResult
 	if off, err := a.offline(ctx); err != nil || off {
 		if err == nil {
-			err = errors.New("moolah is offline (setting offline=true or --offline); add rates with: moolah price add")
+			err = errors.New("moolah is offline (setting offline=true or --offline); add rates with: moolah rates add")
 		}
 		return res, err
 	}
@@ -379,7 +379,7 @@ func (a *App) RateSourceText(ctx context.Context, name string) (string, error) {
 	}
 	t, ok := texts[name]
 	if !ok {
-		return "", fmt.Errorf("there is no rate source %q. See: moolah source list", name)
+		return "", fmt.Errorf("there is no rate source %q. See: moolah rates source list", name)
 	}
 	return t, nil
 }
@@ -417,7 +417,7 @@ func (a *App) TestRateSource(ctx context.Context, p TestRateSourceParams) ([]cor
 	}
 	s, ok := all[p.Name]
 	if !ok {
-		return nil, fmt.Errorf("there is no rate source %q. See: moolah source list", p.Name)
+		return nil, fmt.Errorf("there is no rate source %q. See: moolah rates source list", p.Name)
 	}
 	base, err := core.ParseCurrency(p.Base)
 	if err != nil {

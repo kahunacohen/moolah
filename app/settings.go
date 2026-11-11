@@ -238,7 +238,7 @@ func (a *App) SetConfig(ctx context.Context, key, value string) error {
 		}
 		for _, n := range splitList(value) {
 			if _, ok := all[n]; !ok {
-				return fmt.Errorf("there is no rate source %q. See: moolah source list", n)
+				return fmt.Errorf("there is no rate source %q. See: moolah rates source list", n)
 			}
 		}
 		value = strings.Join(splitList(value), ",")

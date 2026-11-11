@@ -11,10 +11,6 @@ import (
 	"moolah/app"
 )
 
-func init() {
-	extraCommands = append(extraCommands, sourceCmd)
-}
-
 func sourceCmd(g *globals) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "source",
@@ -82,7 +78,7 @@ func sourceCmd(g *globals) *cobra.Command {
 				if err != nil {
 					return err
 				}
-				fmt.Fprintf(g.out(), "Saved rate source %s. Try it with: moolah source test %s <from> <to>\n", name, name)
+				fmt.Fprintf(g.out(), "Saved rate source %s. Try it with: moolah rates source test %s <from> <to>\n", name, name)
 				return nil
 			})
 		},
@@ -120,7 +116,7 @@ func sourceCmd(g *globals) *cobra.Command {
 	var from, to string
 	test := &cobra.Command{
 		Use: "test <name> <from-currency> <to-currency>", Short: "Download a few days of rates from one source, without saving",
-		Example: "  moolah source test ecb USD EUR\n  moolah source test boc USD CAD --from 2026-10-01 --to 2026-10-07",
+		Example: "  moolah rates source test ecb USD EUR\n  moolah rates source test boc USD CAD --from 2026-10-01 --to 2026-10-07",
 		Args:    cobra.ExactArgs(3),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			f, err := parseDateFlag(from)

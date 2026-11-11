@@ -324,11 +324,12 @@ For each currency in your book, moolah downloads its rate **into your base curre
 moolah downloads missing rates **automatically** when a report needs them, and stores them. After that, everything works offline. Only currency codes and dates are sent, never your data.
 
 ```sh
-moolah source list                              # rate sources (* = used)
 moolah rates fetch                              # get all missing rates now
 moolah rates fetch --in EUR                     # rates into another currency
-moolah price add 2026-10-31 USD EUR 0.92        # enter a rate yourself
-moolah price import my-rates.csv                # columns: date,from,to,rate
+moolah rates list USD                           # rates stored in the book
+moolah rates add 2026-10-31 USD EUR 0.92        # enter a rate yourself
+moolah rates import my-rates.csv                # columns: date,from,to,rate
+moolah rates source list                        # where rates come from (* = used)
 moolah --offline report networth                # never use the network
 ```
 
@@ -550,7 +551,7 @@ When you have more than one book, reports and the browser UI show the book name 
 | `unknown account "X". Did you mean …?` | The name doesn't exist. Use the suggestion, or create it with `account add` / `category add`. |
 | `"food" is ambiguous: expenses:food, income:food` | A short name matches more than one. Write more of the name. |
 | `transaction does not balance: USD +12.00` | The lines don't add up to zero in that currency. Check the amounts. |
-| `no USD→EUR rate on or before 2026-09-14` | No rate is stored and moolah couldn't download one. Connect to the network and run `moolah rates fetch`, or add the rate with `moolah price add`. |
+| `no USD→EUR rate on or before 2026-09-14` | No rate is stored and moolah couldn't download one. Connect to the network and run `moolah rates fetch`, or add the rate with `moolah rates add`. |
 | `account card:old is closed since 2026-10-31` | The transaction date is after the close date. |
 | `conflict: laptop and desktop both changed data` | See [Working on different machines](#working-on-different-machines). Choose a copy with `moolah sync resolve`. |
 | `changed elsewhere, reload` (browser) | The transaction was changed in another tab or by a CLI command after you opened it. Reload the page and edit again. |
@@ -633,7 +634,7 @@ sync_dir = "/home/you/Dropbox/moolah"
 identity = "/home/you/.config/moolah/age-key.txt"
 ```
 
-Your import profiles, rate sources, rules and categories are **book** data: they are stored in the book's database. A `.toml` file you give to `moolah profile add` or `moolah source add` is only read once, to import it. `moolah profile show` and `moolah source show` print it again from the book.
+Your import profiles, rate sources, rules and categories are **book** data: they are stored in the book's database. A `.toml` file you give to `moolah profile add` or `moolah rates source add` is only read once, to import it. `moolah profile show` and `moolah rates source show` print it again from the book.
 
 ## Security model
 
@@ -646,7 +647,7 @@ Your import profiles, rate sources, rules and categories are **book** data: they
 
 ## Network access
 
-moolah connects to the network only to download exchange rates, when a report needs a missing rate or when you run `moolah rates fetch`. It connects only to the addresses in the rate sources you use (`moolah source list`, `moolah source show <name>`), and it sends only currency codes and date ranges.
+moolah connects to the network only to download exchange rates, when a report needs a missing rate or when you run `moolah rates fetch`. It connects only to the addresses in the rate sources you use (`moolah rates source list`, `moolah rates source show <name>`), and it sends only currency codes and date ranges.
 
 Built-in sources:
 
@@ -735,7 +736,7 @@ Use read-only mode. Changing data with SQL skips moolah's rules. Make a backup f
 |---|---|
 | `database is locked` | Another long write is running (for example a big import). Wait and try again. If no moolah process is running, check for a stuck process with `pgrep moolah`. |
 | Browser shows "invalid token" | Open the URL that `moolah serve` printed, including `?token=`. |
-| Rates fail to download | Check the network. Test one source with `moolah source test <name> USD EUR`: it shows the rates, or the error. A rates API sometimes changes; fix the source with `moolah source edit <name>`, or enter rates with `moolah price add`. |
+| Rates fail to download | Check the network. Test one source with `moolah rates source test <name> USD EUR`: it shows the rates, or the error. A rates API sometimes changes; fix the source with `moolah rates source edit <name>`, or enter rates with `moolah rates add`. |
 | Right-to-left text (Hebrew, Arabic) looks reversed in the terminal | A terminal limitation. Use `--format csv` or the browser UI. |
 | An import gave wrong amounts or dates | `moolah import undo <id>`, then report the problem with a sample file (personal details removed). |
 
