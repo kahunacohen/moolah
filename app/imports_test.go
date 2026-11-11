@@ -86,6 +86,46 @@ func TestImport(t *testing.T) {
 			t.Fatalf("%d transactions on savings", len(reg.Rows))
 		}
 	})
+	// Two equal transfers a few days apart are each paired with the closest row
+	// from the other account's export, so dates stay right.
+	t.Run("equal transfers pair by closest date", func(t *testing.T) {
+		a := newBook(t)
+		mustDo(t, func() error {
+			_, err := a.AddAccount(ctx, AddAccountParams{Path: "assets:bank:savings", Currency: "ILS"})
+			return err
+		})
+		mustDo(t, func() error {
+			_, _, err := a.AddRule(ctx, RuleParams{Pattern: "to savings", Account: "assets:bank:savings"})
+			return err
+		})
+		mustDo(t, func() error {
+			_, _, err := a.AddRule(ctx, RuleParams{Pattern: "from leumi", Account: "assets:bank:leumi"})
+			return err
+		})
+		importOK(t, a, ImportParams{File: csvFile(t, "2026-10-02,Transfer to savings,-500", "2026-10-05,Transfer to savings,-500"), Account: "leumi"})
+		importOK(t, a, ImportParams{File: csvFile(t, "2026-10-06,Transfer from leumi,500"), Account: "savings"})
+		reg, err := a.Register(ctx, RegisterParams{Account: "savings"})
+		if err != nil || len(reg.Rows) != 2 {
+			t.Fatalf("%+v %v", reg, err)
+		}
+		tree, err := a.Tree(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		savings, err := realAccount(tree, "savings")
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, r := range reg.Rows {
+			linked, err := a.st.ImportedInto(ctx, savings.ID, r.ID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if want := r.Date.String() == "2026-10-05"; linked != want {
+				t.Errorf("transfer on %s linked: %v", r.Date, linked)
+			}
+		}
+	})
 	// Undo removes what an import created, and the same file can be imported again.
 	t.Run("undo allows import again", func(t *testing.T) {
 		a := newBook(t)

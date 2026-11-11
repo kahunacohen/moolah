@@ -53,6 +53,15 @@ func (d Date) Before(o Date) bool { return d.t.Before(o.t) }
 // After reports whether d is after o.
 func (d Date) After(o Date) bool { return d.t.After(o.t) }
 
+// DaysApart returns the number of days between d and o, never negative.
+func (d Date) DaysApart(o Date) int {
+	n := int(o.t.Sub(d.t).Hours() / 24)
+	if n < 0 {
+		return -n
+	}
+	return n
+}
+
 // AddDays returns d plus n days.
 func (d Date) AddDays(n int) Date { return Date{t: d.t.AddDate(0, 0, n)} }
 

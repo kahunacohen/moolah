@@ -386,6 +386,8 @@ func findTransfer(ctx context.Context, tx *store.Tx, account, other int64, amoun
 	if err != nil {
 		return 0, err
 	}
+	var best int64
+	bestDays := 0
 	for _, t := range txs {
 		if len(t.Postings) != 2 {
 			continue
@@ -406,11 +408,12 @@ func findTransfer(ctx context.Context, tx *store.Tx, account, other int64, amoun
 		if err != nil {
 			return 0, err
 		}
-		if !used {
-			return t.ID, nil
+		// Of several equal transfers, the closest date is the most likely pair.
+		if days := t.Date.DaysApart(date); !used && (best == 0 || days < bestDays) {
+			best, bestDays = t.ID, days
 		}
 	}
-	return 0, nil
+	return best, nil
 }
 
 func (a *App) importAccount(ctx context.Context, tx *store.Tx, tree *core.Tree, name, profile string) (core.Account, error) {
