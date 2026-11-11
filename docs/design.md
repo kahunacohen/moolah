@@ -172,7 +172,7 @@ The user moves between computers often, but works on one at a time.
 
 ## 8d. Named books
 - A **book** = one complete, separate set of finances = one DB file: `~/.local/share/moolah/books/<name>.db`. Each book has its own accounts, settings, base currency, rules, profiles, sync folder and backup key. Books share nothing.
-- `moolah book list|add <name>|rename|remove`, and **`moolah book use <name>`**, which sets the **current book** (saved in `~/.config/moolah/current-book`, similar to `kubectl config use-context`). Every command uses the current book, so `--book` is rarely needed.
+- `moolah book list|add <name>|rename|remove`, and **`moolah book use <name>`**, which sets the **current book** (saved in `~/.config/moolah/config.toml`, similar to `kubectl config use-context`). Every command uses the current book, so `--book` is rarely needed.
 - Order: `--book NAME` flag > `MOOLAH_BOOK` env var (for one shell) > current book > `main`. `--db PATH` still works for any file.
 - With only one book, books are invisible: no flag and no name in the output. With two or more books, report headers and the web page header show the book name, so it is always clear which book you are looking at.
 - `init` creates the first book, named `main`. `moolah serve --book mom` serves one book; the page header shows the book name.

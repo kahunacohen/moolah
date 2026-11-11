@@ -19,6 +19,7 @@ import (
 //   - Rebuilding a table drops its indexes and change-counter triggers; create them again.
 //   - A new table needs rows in the upgrade test data (migrate_test.go).
 var migrations = []string{
+	// v1: the schema of the first release. Nothing before it was ever released.
 	`
 CREATE TABLE meta (
 	key   TEXT PRIMARY KEY,
@@ -87,19 +88,23 @@ CREATE TABLE transaction_tags (
 );
 CREATE INDEX transaction_tags_tag ON transaction_tags(tag_id);
 
+-- source is a rate source name (rate sources are TOML data), 'manual' or 'tx'.
 CREATE TABLE prices (
 	date   TEXT NOT NULL,
 	base   TEXT NOT NULL,
 	quote  TEXT NOT NULL,
 	rate   TEXT NOT NULL,
-	source TEXT NOT NULL CHECK (source IN ('boi','ecb','manual','tx')),
+	source TEXT NOT NULL,
 	PRIMARY KEY (base, quote, date, source)
 );
-`,
-	// v2: change counter for sync.
-	changeCounter("accounts", "transactions", "postings", "transaction_meta", "tags", "transaction_tags", "prices", "settings"),
-	// v3: import (profiles, batches, imported rows for duplicate detection and undo) and rules.
-	`
+
+CREATE TABLE rate_sources (
+	name       TEXT PRIMARY KEY,
+	toml       TEXT NOT NULL,
+	updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))
+);
+
+-- Import: profiles, batches, and imported rows for duplicate detection and undo.
 CREATE TABLE import_profiles (
 	name       TEXT PRIMARY KEY,
 	toml       TEXT NOT NULL,
@@ -130,41 +135,10 @@ CREATE TABLE import_rows (
 );
 CREATE INDEX import_rows_batch ON import_rows(batch_id);
 CREATE INDEX import_rows_transaction ON import_rows(transaction_id);
-CREATE TABLE rules (
-	id         INTEGER PRIMARY KEY,
-	position   INTEGER NOT NULL,
-	pattern    TEXT NOT NULL,
-	account_id INTEGER NOT NULL REFERENCES accounts(id),
-	min_amount TEXT,
-	max_amount TEXT,
-	tags       TEXT NOT NULL DEFAULT ''
-);
-` + changeCounter("import_profiles", "profile_accounts", "import_batches", "import_rows", "rules"),
-	// v4: rate sources are user data (TOML), so prices.source is any source name.
-	// SQLite cannot drop a CHECK constraint, so the table is rebuilt; dropping it
-	// also drops its change-counter triggers, which are created again.
-	`
-CREATE TABLE prices_v4 (
-	date   TEXT NOT NULL,
-	base   TEXT NOT NULL,
-	quote  TEXT NOT NULL,
-	rate   TEXT NOT NULL,
-	source TEXT NOT NULL,
-	PRIMARY KEY (base, quote, date, source)
-);
-INSERT INTO prices_v4 (date, base, quote, rate, source) SELECT date, base, quote, rate, source FROM prices;
-DROP TABLE prices;
-ALTER TABLE prices_v4 RENAME TO prices;
-CREATE TABLE rate_sources (
-	name       TEXT PRIMARY KEY,
-	toml       TEXT NOT NULL,
-	updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))
-);
-` + changeCounter("prices", "rate_sources"),
-	// v5: an imported transfer between accounts in two currencies needs the amount
-	// from both exports. This keeps one side until the other arrives. A row is
-	// waiting while its import row has no transaction.
-	`
+
+-- An imported transfer between accounts in two currencies needs the amount from
+-- both exports. This keeps one side until the other arrives. A row is waiting
+-- while its import row has no transaction.
 CREATE TABLE transfer_rows (
 	import_row_id INTEGER PRIMARY KEY REFERENCES import_rows(id) ON DELETE CASCADE,
 	target_id     INTEGER NOT NULL REFERENCES accounts(id),
@@ -175,7 +149,18 @@ CREATE TABLE transfer_rows (
 	tags          TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX transfer_rows_target ON transfer_rows(target_id);
-` + changeCounter("transfer_rows"),
+
+CREATE TABLE rules (
+	id         INTEGER PRIMARY KEY,
+	position   INTEGER NOT NULL,
+	pattern    TEXT NOT NULL,
+	account_id INTEGER NOT NULL REFERENCES accounts(id),
+	min_amount TEXT,
+	max_amount TEXT,
+	tags       TEXT NOT NULL DEFAULT ''
+);
+` + changeCounter("settings", "accounts", "transactions", "postings", "transaction_meta", "tags", "transaction_tags",
+		"prices", "rate_sources", "import_profiles", "profile_accounts", "import_batches", "import_rows", "transfer_rows", "rules"),
 }
 
 // changeCounter adds triggers that increase meta.change_seq on every write to the

@@ -2,8 +2,6 @@ package app
 
 import (
 	"bytes"
-	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -35,13 +33,12 @@ const configHeader = "# moolah settings for this computer only (never synced).\n
 // ConfigFile is the path of this computer's config file.
 func (p Paths) ConfigFile() string { return filepath.Join(p.ConfigDir, "config.toml") }
 
-// LoadConfig reads this computer's config. Unknown keys are errors. Older setups
-// (a current-book file and sync/*.json files) are moved into it on first use.
+// LoadConfig reads this computer's config. Unknown keys are errors.
 func (p Paths) LoadConfig() (ComputerConfig, error) {
 	var c ComputerConfig
 	data, err := os.ReadFile(p.ConfigFile())
 	if errors.Is(err, os.ErrNotExist) {
-		return p.migrateLegacyConfig()
+		return c, nil
 	}
 	if err != nil {
 		return c, err
@@ -95,82 +92,4 @@ func (p Paths) UpdateConfig(change func(c *ComputerConfig) error) error {
 		return err
 	}
 	return p.SaveConfig(c)
-}
-
-// migrateLegacyConfig builds config.toml from the files older versions wrote.
-func (p Paths) migrateLegacyConfig() (ComputerConfig, error) {
-	var c ComputerConfig
-	legacy := false
-	cur := filepath.Join(p.ConfigDir, "current-book")
-	if b, err := os.ReadFile(cur); err == nil {
-		if name := strings.TrimSpace(string(b)); ValidateBookName(name) == nil {
-			c.CurrentBook = name
-		}
-		legacy = true
-	}
-	files, _ := filepath.Glob(filepath.Join(p.ConfigDir, "sync", "*.json"))
-	for _, f := range files {
-		b, err := os.ReadFile(f)
-		if err != nil {
-			return c, err
-		}
-		var old struct {
-			Dir      string `json:"dir"`
-			Identity string `json:"identity"`
-		}
-		if err := json.Unmarshal(b, &old); err != nil {
-			return c, fmt.Errorf("%s: %w", f, err)
-		}
-		if c.Books == nil {
-			c.Books = map[string]BookSync{}
-		}
-		c.Books[strings.TrimSuffix(filepath.Base(f), ".json")] = BookSync{Identity: old.Identity, SyncDir: old.Dir}
-		legacy = true
-	}
-	if !legacy {
-		return c, nil
-	}
-	if err := p.SaveConfig(c); err != nil {
-		return c, err
-	}
-	_ = os.Remove(cur)
-	for _, f := range files {
-		_ = os.Remove(f)
-	}
-	_ = os.Remove(filepath.Join(p.ConfigDir, "sync"))
-	return c, nil
-}
-
-// moveComputerSettings moves settings that older versions kept in the book
-// (backup_dir, offline) to this computer's config, and removes them from the book.
-func (a *App) moveComputerSettings(ctx context.Context) error {
-	dir, hasDir, err := a.st.Setting(ctx, "backup_dir")
-	if err != nil {
-		return err
-	}
-	off, hasOff, err := a.st.Setting(ctx, "offline")
-	if err != nil {
-		return err
-	}
-	if !hasDir && !hasOff {
-		return nil
-	}
-	err = a.Paths.UpdateConfig(func(c *ComputerConfig) error {
-		if hasDir && c.BackupDir == "" {
-			c.BackupDir = dir
-		}
-		if hasOff && off == "true" {
-			c.Offline = true
-		}
-		return nil
-	})
-	if err != nil {
-		return err
-	}
-	for _, k := range []string{"backup_dir", "offline"} {
-		if err := a.st.DeleteSetting(ctx, k); err != nil {
-			return err
-		}
-	}
-	return nil
 }

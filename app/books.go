@@ -15,7 +15,7 @@ const DefaultBook = "main"
 
 // Paths holds the directories moolah uses.
 type Paths struct {
-	ConfigDir string // ~/.config/moolah: current-book, sync settings per book, age key
+	ConfigDir string // ~/.config/moolah: config.toml, age key
 	DataDir   string // ~/.local/share/moolah: books/, backups/
 	StateDir  string // ~/.local/state/moolah: machine-id
 }

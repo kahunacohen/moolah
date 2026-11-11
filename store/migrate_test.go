@@ -21,27 +21,22 @@ INSERT INTO meta (key, value) VALUES ('db_id', 'test-book');
 INSERT INTO settings (key, value) VALUES ('base_currency', 'EUR');
 INSERT INTO accounts (id, parent_id, name, type, currency) VALUES
 	(1, NULL, 'assets', 'assets', NULL), (2, 1, 'checking', 'assets', 'EUR'),
-	(3, NULL, 'expenses', 'expenses', NULL), (4, 3, 'food', 'expenses', NULL);
+	(3, NULL, 'expenses', 'expenses', NULL), (4, 3, 'food', 'expenses', NULL),
+	(5, NULL, 'liabilities', 'liabilities', NULL), (6, 5, 'card', 'liabilities', 'USD');
 INSERT INTO transactions (id, date, payee) VALUES (1, '2026-01-05', 'Cafe');
 INSERT INTO postings (transaction_id, account_id, currency, amount) VALUES (1, 2, 'EUR', -850), (1, 4, 'EUR', 850);
 INSERT INTO transaction_meta (transaction_id, key, value) VALUES (1, 'orig', '9.20 USD');
 INSERT INTO tags (id, name) VALUES (1, 'trip');
 INSERT INTO transaction_tags (transaction_id, tag_id) VALUES (1, 1);
 INSERT INTO prices (date, base, quote, rate, source) VALUES ('2026-01-05', 'USD', 'EUR', '0.92', 'ecb');
-`,
-	3: `
+INSERT INTO rate_sources (name, toml) VALUES ('my-source', 'name = "my-source"');
 INSERT INTO import_profiles (name, toml) VALUES ('my-bank', 'name = "my-bank"');
 INSERT INTO profile_accounts (profile, account_id) VALUES ('my-bank', 2);
 INSERT INTO import_batches (id, account_id, profile, file_name) VALUES (1, 2, 'my-bank', 'export.csv');
-INSERT INTO import_rows (batch_id, account_id, fingerprint, line, raw, transaction_id) VALUES (1, 2, 'abc', 2, '2026-01-05,Cafe,-8.50', 1);
+INSERT INTO import_rows (id, batch_id, account_id, fingerprint, line, raw, transaction_id) VALUES
+	(1, 1, 2, 'abc', 2, '2026-01-05,Cafe,-8.50', 1), (2, 1, 2, 'def', 3, '2026-01-06,Card payment,-100.00', NULL);
+INSERT INTO transfer_rows (import_row_id, target_id, date, amount, payee) VALUES (2, 6, '2026-01-06', -10000, 'Card payment');
 INSERT INTO rules (position, pattern, account_id) VALUES (1, 'cafe', 4);
-`,
-	4: `
-INSERT INTO rate_sources (name, toml) VALUES ('my-source', 'name = "my-source"');
-`,
-	5: `
-INSERT INTO import_rows (id, batch_id, account_id, fingerprint, line, raw) VALUES (2, 1, 2, 'def', 3, '2026-01-06,Card payment,-100.00');
-INSERT INTO transfer_rows (import_row_id, target_id, date, amount, payee) VALUES (2, 4, '2026-01-06', -10000, 'Card payment');
 `,
 }
 

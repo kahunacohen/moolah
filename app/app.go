@@ -46,10 +46,6 @@ func Open(path, book string, paths Paths) (*App, error) {
 		return nil, err
 	}
 	a.st = st
-	if err := a.moveComputerSettings(context.Background()); err != nil {
-		_ = st.Close()
-		return nil, err
-	}
 	return a, nil
 }
 

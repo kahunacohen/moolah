@@ -3,7 +3,6 @@ package app
 
 import (
 	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -27,28 +26,6 @@ func TestSettingPlaces(t *testing.T) {
 		}
 		if v, _ := a.Config(ctx, KeyBackupDir); v != "/backups/moolah" {
 			t.Fatalf("got %q", v)
-		}
-	})
-	// Setups from older versions (current-book file, sync JSON, settings in the book) move to config.toml.
-	t.Run("older setups are migrated", func(t *testing.T) {
-		a := newBook(t)
-		dir := a.Paths.ConfigDir
-		mustDo(t, func() error { return os.MkdirAll(filepath.Join(dir, "sync"), 0o700) })
-		mustDo(t, func() error { return os.WriteFile(filepath.Join(dir, "current-book"), []byte("main\n"), 0o600) })
-		mustDo(t, func() error {
-			return os.WriteFile(filepath.Join(dir, "sync", "abc.json"), []byte(`{"dir":"/sync/x","identity":"/k"}`), 0o600)
-		})
-		mustDo(t, func() error { return a.st.SetSetting(ctx, "offline", "true") })
-		mustDo(t, func() error { return a.moveComputerSettings(ctx) })
-		c, err := a.Paths.LoadConfig()
-		if err != nil || c.CurrentBook != "main" || c.Books["abc"].SyncDir != "/sync/x" || !c.Offline {
-			t.Fatalf("config %+v, %v", c, err)
-		}
-		if _, err := os.Stat(filepath.Join(dir, "current-book")); err == nil {
-			t.Fatal("old file was not removed")
-		}
-		if _, ok, _ := a.st.Setting(ctx, "offline"); ok {
-			t.Fatal("offline is still in the book")
 		}
 	})
 	// A typo in config.toml is an error that names the file and the key.
