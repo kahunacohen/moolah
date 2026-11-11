@@ -45,36 +45,30 @@ func (g *globals) createBook(f initFlags, loc app.Location) (*app.App, error) {
 		return nil, fmt.Errorf("book %q already exists", nameOr(loc.Book, loc.Path))
 	}
 	ask := g.env.Interactive
+	canSync := !f.noSync && !f.noBackupKey
 	var err error
-	if f.syncDir == "" && ask && !f.noSync && !f.noBackupKey {
-		if f.syncDir, err = g.in.ask("Sync folder for your other computers (Enter to skip)", ""); err != nil {
+	// Joining asks nothing else, so it is decided first.
+	if f.syncDir == "" && ask && canSync {
+		other, err := g.in.confirmDefault("Do you already use moolah on another computer?", false)
+		if err != nil {
 			return nil, err
+		}
+		if other {
+			if f.syncDir, err = g.in.ask("Its sync folder (the folder your sync tool shares, for example ~/Dropbox/moolah)", ""); err != nil {
+				return nil, err
+			}
+			if f.syncDir == "" {
+				return nil, errors.New("give the sync folder to join it, or run moolah init again and answer no")
+			}
+			f.join = true
 		}
 	}
 	if f.syncDir != "" {
-		head, err := app.SyncFolderInfo(f.syncDir)
-		if err != nil && !errors.Is(err, os.ErrNotExist) {
-			return nil, err
+		if a, err := g.joinFolder(f, loc); a != nil || err != nil {
+			return a, err
 		}
-		if head != nil {
-			join := f.join
-			if !join && ask {
-				if join, err = g.in.confirmDefault(fmt.Sprintf("This folder has moolah data (last change: %s, %s). Join it?",
-					head.Machine, head.ModTime.Local().Format("2006-01-02 15:04")), true); err != nil {
-					return nil, err
-				}
-			}
-			if !join {
-				return nil, fmt.Errorf("%s already has moolah data; use --join to join it, or choose an empty folder", f.syncDir)
-			}
-			a, err := app.Join(app.JoinParams{Book: loc.Book, Dir: f.syncDir, Identity: f.identity, Path: loc.Path,
-				Passphrase: func() (string, error) { return g.in.passphrase(false) }}, g.env.Paths)
-			if err != nil {
-				return nil, err
-			}
-			a.SetClock(g.env.Now)
-			fmt.Fprintln(g.out(), "Joined the book in the sync folder. Your data is up to date.")
-			return a, nil
+		if f.join {
+			return nil, fmt.Errorf("%s has no moolah data yet. Wait until your sync tool has copied it, then run moolah init again", f.syncDir)
 		}
 	}
 	sysLocale, sysCurrency := app.SystemDefaults(g.env.Getenv)
@@ -101,6 +95,16 @@ func (g *globals) createBook(f initFlags, loc app.Location) (*app.App, error) {
 			}
 		}
 	}
+	if f.syncDir == "" && ask && canSync {
+		if f.syncDir, err = g.in.ask("Sync folder for your other computers (Enter to skip; add one later with: moolah sync init <folder>)", ""); err != nil {
+			return nil, err
+		}
+		if f.syncDir != "" {
+			if a, err := g.joinFolder(f, loc); a != nil || err != nil {
+				return a, err
+			}
+		}
+	}
 	if f.backupRecipient == "" && !f.noBackupKey {
 		if f.backupRecipient, err = g.chooseKey(ask, f.syncDir != ""); err != nil {
 			return nil, err
@@ -124,6 +128,36 @@ func (g *globals) createBook(f initFlags, loc app.Location) (*app.App, error) {
 	return a, nil
 }
 
+// joinFolder joins the book in the sync folder when the folder has moolah data and
+// the user agrees (or gave --join). It returns nil when the folder has no data.
+func (g *globals) joinFolder(f initFlags, loc app.Location) (*app.App, error) {
+	head, err := app.SyncFolderInfo(f.syncDir)
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return nil, err
+	}
+	if head == nil {
+		return nil, nil
+	}
+	join := f.join
+	if !join && g.env.Interactive {
+		if join, err = g.in.confirmDefault(fmt.Sprintf("This folder has moolah data (last change: %s, %s). Join it?",
+			head.Machine, head.ModTime.Local().Format("2006-01-02 15:04")), true); err != nil {
+			return nil, err
+		}
+	}
+	if !join {
+		return nil, fmt.Errorf("%s already has moolah data; use --join to join it, or choose an empty folder", f.syncDir)
+	}
+	a, err := app.Join(app.JoinParams{Book: loc.Book, Dir: f.syncDir, Identity: f.identity, Path: loc.Path,
+		Passphrase: func() (string, error) { return g.in.passphrase(false) }}, g.env.Paths)
+	if err != nil {
+		return nil, err
+	}
+	a.SetClock(g.env.Now)
+	fmt.Fprintln(g.out(), "Joined the book in the sync folder. Your data is up to date.")
+	return a, nil
+}
+
 // chooseKey picks the public key that encrypts backups and snapshots. When sync is
 // wanted, a key is required, so moolah creates its own age key if there is none.
 func (g *globals) chooseKey(ask, needed bool) (string, error) {
@@ -131,7 +165,7 @@ func (g *globals) chooseKey(ask, needed bool) (string, error) {
 		pub, _, err := g.env.Paths.Keygen()
 		return pub, err
 	}
-	ssh := app.DefaultSSHPublicKey()
+	ssh := app.DefaultSSHPublicKey(g.env.Getenv("HOME"))
 	if ask {
 		def := "new"
 		if ssh != "" {

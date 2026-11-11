@@ -20,9 +20,10 @@ var update = flag.Bool("update", false, "rewrite golden files")
 
 // session runs commands against one temporary set of books and records the output.
 type session struct {
-	env app.Paths
-	log bytes.Buffer
-	t   *testing.T
+	answers string // typed into the prompts of the next command, which then runs as in a terminal
+	env     app.Paths
+	log     bytes.Buffer
+	t       *testing.T
 }
 
 func newSession(t *testing.T) *session {
@@ -35,17 +36,22 @@ func (s *session) run(line string) {
 	var out, errOut bytes.Buffer
 	env := Env{
 		Getenv:      func(string) string { return "" },
-		Interactive: false,
+		Interactive: s.answers != "",
 		Now:         func() time.Time { return time.Date(2026, 11, 4, 12, 0, 0, 0, time.UTC) },
 		Offline:     true,
 		Paths:       s.env,
 		Stderr:      &errOut,
-		Stdin:       strings.NewReader(""),
+		Stdin:       strings.NewReader(s.answers),
 		Stdout:      &out,
+	}
+	shown := line
+	if s.answers != "" {
+		shown += "    # answers: " + strings.ReplaceAll(strings.TrimSuffix(s.answers, "\n"), "\n", " | ")
+		s.answers = ""
 	}
 	code := Run(env, splitArgs(line))
 	tmp := filepath.Dir(s.env.DataDir)
-	fmt.Fprintf(&s.log, "$ moolah %s\n%s", strings.ReplaceAll(line, tmp, "$TMP"), strings.ReplaceAll(out.String(), tmp, "$TMP"))
+	fmt.Fprintf(&s.log, "$ moolah %s\n%s", strings.ReplaceAll(shown, tmp, "$TMP"), strings.ReplaceAll(out.String(), tmp, "$TMP"))
 	if errOut.Len() > 0 {
 		s.log.WriteString(strings.ReplaceAll(errOut.String(), tmp, "$TMP"))
 	}
@@ -233,6 +239,41 @@ func TestImportScenario(t *testing.T) {
 		s.run("review")
 		s.run("register chase")
 		s.golden("import-currencies")
+	})
+}
+
+func TestInitQuestions(t *testing.T) {
+	// A new user is asked about sync only after the book's own questions, while
+	// someone who already uses moolah joins with no other question.
+	t.Run("new user, joining, and an empty folder", func(t *testing.T) {
+		first, second := newSession(t), newSession(t)
+		folder := filepath.Join(t.TempDir(), "Dropbox")
+		empty := filepath.Join(t.TempDir(), "empty")
+		writeMachineID(t, first, "laptop-0001")
+		writeMachineID(t, second, "desktop-0002")
+		var log bytes.Buffer
+		step := func(s *session, who, line, answers string) {
+			s.log.Reset()
+			s.answers = strings.NewReplacer("$FOLDER", folder, "$EMPTY", empty).Replace(answers)
+			s.run(line)
+			log.WriteString("[" + who + "] " + strings.NewReplacer(folder, "$FOLDER", empty, "$EMPTY").Replace(s.log.String()))
+		}
+		step(first, "laptop", "init", "n\nEUR\n\n$FOLDER\nnew\n")
+		key, err := os.ReadFile(first.env.KeyFile())
+		if err != nil {
+			t.Fatalf("%v\n%s", err, log.String())
+		}
+		if err := os.MkdirAll(second.env.ConfigDir, 0o700); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(second.env.KeyFile(), key, 0o600); err != nil {
+			t.Fatal(err)
+		}
+		step(second, "desktop", "init", "y\n$EMPTY\n")
+		step(second, "desktop", "init", "y\n$FOLDER\n")
+		step(second, "desktop", "config get base_currency", "")
+		s := &session{log: log, t: t}
+		s.golden("init")
 	})
 }
 

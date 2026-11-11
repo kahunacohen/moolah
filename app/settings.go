@@ -279,10 +279,9 @@ func (a *App) backupDir() (string, error) {
 	return a.Paths.DefaultBackupDir(), nil
 }
 
-// DefaultSSHPublicKey returns the user's ed25519 SSH public key, if there is one.
-func DefaultSSHPublicKey() string {
-	home, err := os.UserHomeDir()
-	if err != nil {
+// DefaultSSHPublicKey returns the ed25519 SSH public key in home, if there is one.
+func DefaultSSHPublicKey(home string) string {
+	if home == "" {
 		return ""
 	}
 	b, err := os.ReadFile(filepath.Join(home, ".ssh", "id_ed25519.pub"))

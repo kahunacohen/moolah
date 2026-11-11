@@ -1,0 +1,19 @@
+[laptop] $ moolah init    # answers: n | EUR |  | $FOLDER | new
+Created the encryption key $TMP/config/age-key.txt. Keep a copy somewhere safe; copy it to your other computers.
+This book syncs through $FOLDER.
+Book "main" is ready in $TMP/data/books/main.db (base currency EUR).
+Next: add your accounts, for example:
+  moolah account add assets:bank:mybank --currency EUR --opening 1000
+  moolah category list
+Do you already use moolah on another computer? [y/N]: Base currency (ISO code, for example USD, EUR, GBP): Language and number format (for example en_US, de_DE, he_IL) [en_US]: Sync folder for your other computers (Enter to skip; add one later with: moolah sync init <folder>): Encryption key for backups and sync: 'new' (create one), 'ssh' (~/.ssh/id_ed25519.pub), a public key, or 'none' (a passphrase each time) [new]: 
+[desktop] $ moolah init    # answers: y | $EMPTY
+Do you already use moolah on another computer? [y/N]: Its sync folder (the folder your sync tool shares, for example ~/Dropbox/moolah): error: $EMPTY has no moolah data yet. Wait until your sync tool has copied it, then run moolah init again
+[exit 1]
+
+[desktop] $ moolah init    # answers: y | $FOLDER
+Joined the book in the sync folder. Your data is up to date.
+Book "main" is ready in $TMP/data/books/main.db (base currency EUR).
+Do you already use moolah on another computer? [y/N]: Its sync folder (the folder your sync tool shares, for example ~/Dropbox/moolah): 
+[desktop] $ moolah config get base_currency
+EUR
+

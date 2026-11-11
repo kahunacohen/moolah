@@ -458,13 +458,14 @@ You can use moolah on several computers, for example a desktop at home and a lap
 
 ### Setting up the first machine
 
-`moolah init` first asks for a sync folder. Give one now, or add it later with `moolah sync init <folder>`.
+`moolah init` asks for a sync folder after the book's own questions. Give one now, or add it later with `moolah sync init <folder>`.
 
 ```
 $ moolah init
-Sync folder for your other computers (Enter to skip): ~/Dropbox/moolah
+Do you already use moolah on another computer? [y/N]:
 Base currency (ISO code, for example USD, EUR, GBP) [EUR]:
 Language and number format (for example en_US, de_DE, he_IL) [en_US]: de_DE
+Sync folder for your other computers (Enter to skip; add one later with: moolah sync init <folder>): ~/Dropbox/moolah
 Encryption key for backups and sync: 'new' (create one), 'ssh' (~/.ssh/id_ed25519.pub), a public key, or 'none' (a passphrase each time) [new]:
 Created the encryption key ~/.config/moolah/age-key.txt. Keep a copy somewhere safe; copy it to your other computers.
 This book syncs through ~/Dropbox/moolah.
@@ -474,14 +475,16 @@ Sync needs an encryption key. **Copy the private key file to each of your comput
 
 ### Adding another machine
 
-Install moolah, copy the private key to this machine, wait until the sync folder is synced, then run `init` with the same folder. moolah sees the existing data and joins it, so it asks nothing else:
+Install moolah, copy the private key to this machine, and wait until the sync folder is synced. Then run `init` and answer **yes** to the first question. moolah joins the existing book, so it asks nothing else:
 
 ```
 $ moolah init
-Sync folder for your other computers (Enter to skip): ~/Dropbox/moolah
-This folder has moolah data (last change: laptop-3f2a, 2026-11-04 10:32). Join it? [Y/n]:
+Do you already use moolah on another computer? [y/N]: y
+Its sync folder (the folder your sync tool shares, for example ~/Dropbox/moolah): ~/Dropbox/moolah
 Joined the book in the sync folder. Your data is up to date.
 ```
+
+If the folder is still empty (your sync tool has not finished), moolah says so and creates nothing.
 
 Without prompts: `moolah init --sync-dir ~/Dropbox/moolah --join`.
 
