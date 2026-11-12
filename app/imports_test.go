@@ -67,7 +67,7 @@ func TestImport(t *testing.T) {
 	t.Run("transfer from both sides is recorded once", func(t *testing.T) {
 		a := newBook(t)
 		mustDo(t, func() error {
-			_, err := a.AddAccount(ctx, AddAccountParams{Path: "assets:bank:savings", Currency: "ILS"})
+			_, err := a.AddAccount(ctx, AddAccountParams{Name: "assets:bank:savings", Currency: "ILS"})
 			return err
 		})
 		mustDo(t, func() error {
@@ -93,7 +93,7 @@ func TestImport(t *testing.T) {
 	t.Run("equal transfers pair by closest date", func(t *testing.T) {
 		a := newBook(t)
 		mustDo(t, func() error {
-			_, err := a.AddAccount(ctx, AddAccountParams{Path: "assets:bank:savings", Currency: "ILS"})
+			_, err := a.AddAccount(ctx, AddAccountParams{Name: "assets:bank:savings", Currency: "ILS"})
 			return err
 		})
 		mustDo(t, func() error {

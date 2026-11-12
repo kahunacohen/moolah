@@ -43,7 +43,7 @@ func TestReports(t *testing.T) {
 		a.Offline = false
 		a.Fetchers = []prices.Fetcher{&fakeFetcher{prices: []core.Price{usdPrice("2026-01-01", "3.70"), usdPrice("2026-10-31", "3.90")}}}
 		mustDo(t, func() error {
-			_, err := a.AddAccount(ctx, AddAccountParams{Path: "assets:bank:usd", Currency: "USD", Opening: "1000", OpeningDate: core.MustDate("2026-01-01")})
+			_, err := a.AddAccount(ctx, AddAccountParams{Name: "assets:bank:usd", Currency: "USD", Opening: "1000", OpeningDate: core.MustDate("2026-01-01")})
 			return err
 		})
 		rep, err := a.NetWorth(ctx, NetWorthParams{Period: Period{From: core.MustDate("2026-01-01"), To: core.MustDate("2026-10-31")}})

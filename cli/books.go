@@ -225,7 +225,7 @@ func initCmd(g *globals) *cobra.Command {
 				return nil
 			}
 			fmt.Fprintln(g.out(), "Next: add your accounts, for example:")
-			fmt.Fprintln(g.out(), "  moolah account add assets:bank:mybank --currency "+string(base)+" --opening 1000")
+			fmt.Fprintln(g.out(), "  moolah account add Checking --kind bank --currency "+string(base)+" --opening 1000")
 			fmt.Fprintln(g.out(), "  moolah category list")
 			return nil
 		},

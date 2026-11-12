@@ -335,11 +335,16 @@ func (s *Server) deletePost(w http.ResponseWriter, r *http.Request) {
 
 type accountsData struct {
 	Form   map[string]string
+	Kinds  []app.Kind
 	Report app.BalanceReport
 }
 
 func (s *Server) accounts(w http.ResponseWriter, r *http.Request) {
-	s.accountsPage(w, r, map[string]string{"date": core.DateOf(timeNow()).String()}, "")
+	form := map[string]string{"date": core.DateOf(timeNow()).String()}
+	if base, err := s.app.Config(r.Context(), app.KeyBaseCurrency); err == nil {
+		form["currency"] = base
+	}
+	s.accountsPage(w, r, form, "")
 }
 
 func (s *Server) accountsPage(w http.ResponseWriter, r *http.Request, form map[string]string, errMsg string) {
@@ -349,21 +354,25 @@ func (s *Server) accountsPage(w http.ResponseWriter, r *http.Request, form map[s
 	if err != nil && p.Error == "" {
 		p.Error = err.Error()
 	}
+	kinds, err := s.app.Kinds(r.Context())
+	if err != nil && p.Error == "" {
+		p.Error = err.Error()
+	}
 	if errMsg != "" {
 		w.WriteHeader(http.StatusUnprocessableEntity)
 	}
-	s.render(w, "accounts", withData(p, accountsData{Form: form, Report: rep}))
+	s.render(w, "accounts", withData(p, accountsData{Form: form, Kinds: kinds, Report: rep}))
 }
 
 func (s *Server) accountsPost(w http.ResponseWriter, r *http.Request) {
-	f := formValues(r, "path", "currency", "opening", "date")
+	f := formValues(r, "name", "kind", "currency", "opening", "date")
 	var date core.Date
 	var err error
 	if f["date"] != "" {
 		date, err = core.ParseDate(f["date"])
 	}
 	if err == nil {
-		_, err = s.app.AddAccount(r.Context(), app.AddAccountParams{Path: f["path"], Currency: f["currency"], Opening: f["opening"], OpeningDate: date})
+		_, err = s.app.AddAccount(r.Context(), app.AddAccountParams{Currency: f["currency"], Kind: f["kind"], Name: f["name"], Opening: f["opening"], OpeningDate: date})
 	}
 	if err != nil {
 		s.accountsPage(w, r, f, err.Error())
@@ -414,8 +423,8 @@ func (s *Server) categoriesPage(w http.ResponseWriter, r *http.Request, form map
 }
 
 func (s *Server) categoriesPost(w http.ResponseWriter, r *http.Request) {
-	f := formValues(r, "path", "income")
-	if _, err := s.app.AddCategory(r.Context(), app.AddCategoryParams{Path: f["path"], Income: f["income"] == "1"}); err != nil {
+	f := formValues(r, "name", "in", "income")
+	if _, err := s.app.AddCategory(r.Context(), app.AddCategoryParams{Income: f["income"] == "1", Name: f["name"], Parent: f["in"]}); err != nil {
 		s.categoriesPage(w, r, f, err.Error())
 		return
 	}

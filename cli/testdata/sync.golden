@@ -3,11 +3,11 @@ Created the encryption key $TMP/config/age-key.txt. Keep a copy somewhere safe; 
 This book syncs through $FOLDER.
 Book "main" is ready in $TMP/data/books/main.db (base currency ILS).
 Next: add your accounts, for example:
-  moolah account add assets:bank:mybank --currency ILS --opening 1000
+  moolah account add Checking --kind bank --currency ILS --opening 1000
   moolah category list
 
-[laptop] $ moolah account add assets:bank:leumi --currency ILS --opening 1000 --date 2026-10-01
-Added assets:bank:leumi (ILS).
+[laptop] $ moolah account add leumi --kind bank --currency ILS --opening 1000 --date 2026-10-01
+Added account leumi (ILS).
 
 [desktop] $ moolah init --sync-dir $FOLDER --join
 Joined the book in the sync folder. Your data is up to date.

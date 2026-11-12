@@ -9,8 +9,9 @@ import (
 )
 
 // starterAccounts is the tree that "moolah init" creates. Users change it freely.
+// The groups directly under assets and liabilities are the built-in kinds of account.
 var starterAccounts = []string{
-	"assets", "assets:bank", "assets:cash", "assets:invest",
+	"assets", "assets:bank", "assets:cash", "assets:investment", "assets:pension",
 	"liabilities", "liabilities:card", "liabilities:loan",
 	"income", "income:salary", "income:salary:pension", "income:interest", "income:gifts",
 	"income:invest", "income:invest:gains", "income:other",

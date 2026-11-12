@@ -39,11 +39,11 @@ func newBook(t *testing.T) *App {
 		_ = a.Close()
 	})
 	mustDo(t, func() error {
-		_, err := a.AddAccount(ctx, AddAccountParams{Path: "assets:bank:leumi", Currency: "ILS", Opening: "25000", OpeningDate: core.MustDate("2026-10-01")})
+		_, err := a.AddAccount(ctx, AddAccountParams{Name: "assets:bank:leumi", Currency: "ILS", Opening: "25000", OpeningDate: core.MustDate("2026-10-01")})
 		return err
 	})
 	mustDo(t, func() error {
-		_, err := a.AddAccount(ctx, AddAccountParams{Path: "liabilities:card:chase", Currency: "USD"})
+		_, err := a.AddAccount(ctx, AddAccountParams{Name: "liabilities:card:chase", Currency: "USD"})
 		return err
 	})
 	return a
@@ -84,12 +84,12 @@ func TestAccounts(t *testing.T) {
 	// Categories are created under expenses: (or income:) and are named without the root.
 	t.Run("category add uses the expenses root", func(t *testing.T) {
 		a := newBook(t)
-		mustDo(t, func() error { _, err := a.AddCategory(ctx, AddCategoryParams{Path: "food:coffee"}); return err })
+		mustDo(t, func() error { _, err := a.AddCategory(ctx, AddCategoryParams{Name: "food:coffee"}); return err })
 		tree, _ := a.Tree(ctx)
 		if _, ok := tree.Find("expenses:food:coffee"); !ok {
 			t.Fatal("not created")
 		}
-		if _, err := a.AddCategory(ctx, AddCategoryParams{Path: "nosuch:child"}); err == nil {
+		if _, err := a.AddCategory(ctx, AddCategoryParams{Name: "nosuch:child"}); err == nil {
 			t.Fatal("a missing parent must be an error")
 		}
 	})
@@ -177,14 +177,14 @@ func TestTransactions(t *testing.T) {
 	t.Run("valuation books only the difference", func(t *testing.T) {
 		a := newBook(t)
 		mustDo(t, func() error {
-			_, err := a.AddAccount(ctx, AddAccountParams{Path: "assets:invest:pension", Currency: "ILS", Opening: "380000", OpeningDate: core.MustDate("2026-01-01")})
+			_, err := a.AddAccount(ctx, AddAccountParams{Name: "harel", Kind: "pension", Currency: "ILS", Opening: "380000", OpeningDate: core.MustDate("2026-01-01")})
 			return err
 		})
 		mustDo(t, func() error {
-			_, err := a.Add(ctx, AddParams{Account: "pension", Amount: "2400", Category: "salary:pension", TxInfo: TxInfo{Date: core.MustDate("2026-02-10")}})
+			_, err := a.Add(ctx, AddParams{Account: "harel", Amount: "2400", Category: "salary:pension", TxInfo: TxInfo{Date: core.MustDate("2026-02-10")}})
 			return err
 		})
-		res, err := a.Value(ctx, ValueParams{Account: "pension", Value: "390000", Date: core.MustDate("2026-10-31")})
+		res, err := a.Value(ctx, ValueParams{Account: "harel", Value: "390000", Date: core.MustDate("2026-10-31")})
 		if err != nil {
 			t.Fatal(err)
 		}

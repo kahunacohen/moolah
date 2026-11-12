@@ -1,14 +1,14 @@
 $ moolah init --base EUR --no-backup-key
 Book "main" is ready in $TMP/data/books/main.db (base currency EUR).
 Next: add your accounts, for example:
-  moolah account add assets:bank:mybank --currency EUR --opening 1000
+  moolah account add Checking --kind bank --currency EUR --opening 1000
   moolah category list
 
-$ moolah account add assets:bank:checking --currency EUR --opening 5000 --date 2026-10-31
-Added assets:bank:checking (EUR).
+$ moolah account add checking --kind bank --currency EUR --opening 5000 --date 2026-10-31
+Added account checking (EUR).
 
-$ moolah account add liabilities:card:chase --currency USD
-Added liabilities:card:chase (USD).
+$ moolah account add chase --kind card --currency USD
+Added account chase (USD).
 
 $ moolah rule add chase liabilities:card:chase
 Added rule 1.

@@ -7,7 +7,12 @@
 <h2>{{.T "categories.add"}}</h2>
 <form class="grid" method="post" action="/categories">
   {{template "csrf" .}}
-  <label for="path">{{.T "categories.path"}}</label><input id="path" name="path" required value="{{.Data.Form.path}}">
+  <label for="name">{{.T "categories.name"}}</label><input id="name" name="name" required value="{{.Data.Form.name}}">
+  <label for="in">{{.T "categories.in"}}</label><select id="in" name="in">
+    <option value="">{{.T "categories.top"}}</option>
+    {{range .Data.Expenses}}<option value="{{.Name}}" {{if eq .Name $.Data.Form.in}}selected{{end}}>{{.Name}}</option>{{end}}
+  </select>
+  <span class="hint">{{.T "categories.in.hint"}}</span>
   <label for="income">{{.T "categories.income"}}</label><input id="income" name="income" type="checkbox" value="1">
   <span></span><div><button>{{.T "save"}}</button></div>
 </form>

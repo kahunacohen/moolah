@@ -1,24 +1,24 @@
 $ moolah init --base ILS --no-backup-key
 Book "main" is ready in $TMP/data/books/main.db (base currency ILS).
 Next: add your accounts, for example:
-  moolah account add assets:bank:mybank --currency ILS --opening 1000
+  moolah account add Checking --kind bank --currency ILS --opening 1000
   moolah category list
 
-$ moolah account add assets:bank:leumi --currency ILS --opening 25000 --date 2026-10-01
-Added assets:bank:leumi (ILS).
+$ moolah account add leumi --kind bank --currency ILS --opening 25000 --date 2026-10-01
+Added account leumi (ILS).
 
-$ moolah account add liabilities:card:chase --currency USD
-Added liabilities:card:chase (USD).
+$ moolah account add chase --kind card --currency USD
+Added account chase (USD).
 
-$ moolah account add assets:invest:pension --currency ILS --opening 380000 --date 2026-01-01
-Added assets:invest:pension (ILS).
+$ moolah account add harel --kind pension --currency ILS --opening 380000 --date 2026-01-01
+Added account harel (ILS).
 
 $ moolah add leumi -200 food:groceries --payee Shufersal --date 2026-10-03
 Added transaction 3 on 2026-10-03 (Shufersal):
   assets:bank:leumi              -200.00 ILS
   expenses:food:groceries        200.00 ILS
 
-$ moolah add card:chase -42.17 shopping --payee Amazon --date 2026-10-05 --tag vacation-2026
+$ moolah add chase -42.17 shopping --payee Amazon --date 2026-10-05 --tag vacation-2026
 Added transaction 4 on 2026-10-05 (Amazon):
   liabilities:card:chase         -42.17 USD
   expenses:shopping              42.17 USD
@@ -38,18 +38,18 @@ Added transaction 6 on 2026-10-20 (Super-Pharm):
   expenses:health                180.00 ILS
   expenses:household             120.00 ILS
 
-$ moolah transfer leumi card:chase 1530 --to-amount 420 --fee 15 --date 2026-11-01
+$ moolah transfer leumi chase 1530 --to-amount 420 --fee 15 --date 2026-11-01
 Added transaction 7 on 2026-11-01 (Transfer):
   assets:bank:leumi              -1,545.00 ILS
   liabilities:card:chase         420.00 USD (for 1,530.00 ILS)
   expenses:fees                  15.00 ILS
 
-$ moolah add pension 2400 salary:pension --date 2026-02-10
+$ moolah add harel 2400 salary:pension --date 2026-02-10
 Added transaction 8 on 2026-02-10:
-  assets:invest:pension          2,400.00 ILS
+  assets:pension:harel           2,400.00 ILS
   income:salary:pension          -2,400.00 ILS
 
-$ moolah value pension 390000 --date 2026-10-31
+$ moolah value harel 390000 --date 2026-10-31
 Booked a gain of 7,600.00 ILS (balance was 382,400.00 ILS). Transaction 9.
 
 $ moolah rates add 2026-10-01 USD ILS 3.70
@@ -65,8 +65,8 @@ Account             Balance  Value (ILS)
 assets                        414,500.00
   bank                         24,500.00
     leumi     24,500.00 ILS    24,500.00
-  invest                      390,000.00
-    pension  390,000.00 ILS   390,000.00
+  pension                     390,000.00
+    harel    390,000.00 ILS   390,000.00
 liabilities                      -156.03
   card                           -156.03
     chase        -42.17 USD      -156.03
@@ -80,8 +80,8 @@ Account             Balance  Value (ILS)
 assets                        412,870.00
   bank                         22,870.00
     leumi     22,870.00 ILS    22,870.00
-  invest                      390,000.00
-    pension  390,000.00 ILS   390,000.00
+  pension                     390,000.00
+    harel    390,000.00 ILS   390,000.00
 liabilities                     1,435.75
   card                          1,435.75
     chase        377.83 USD     1,435.75
@@ -95,8 +95,8 @@ Account             Balance  Value (USD)
 assets                        108,650.00
   bank                          6,018.42
     leumi     22,870.00 ILS     6,018.42
-  invest                      102,631.58
-    pension  390,000.00 ILS   102,631.58
+  pension                     102,631.58
+    harel    390,000.00 ILS   102,631.58
 liabilities                       377.83
   card                            377.83
     chase        377.83 USD       377.83
@@ -185,8 +185,8 @@ Account             Balance  Value (ILS)
 assets                        414.500,00
   bank                         24.500,00
     leumi     24.500,00 ILS    24.500,00
-  invest                      390.000,00
-    pension  390.000,00 ILS   390.000,00
+  pension                     390.000,00
+    harel    390.000,00 ILS   390.000,00
 liabilities                      -156,03
   card                           -156,03
     chase        -42,17 USD      -156,03
@@ -198,8 +198,8 @@ Account,Balance,Balance currency,Value (ILS)
 assets,,,414500.00
 assets:bank,,,24500.00
 assets:bank:leumi,24500.00,ILS,24500.00
-assets:invest,,,390000.00
-assets:invest:pension,390000.00,ILS,390000.00
+assets:pension,,,390000.00
+assets:pension:harel,390000.00,ILS,390000.00
 liabilities,,,-156.03
 liabilities:card,,,-156.03
 liabilities:card:chase,-42.17,USD,-156.03

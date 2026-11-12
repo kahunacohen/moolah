@@ -44,11 +44,9 @@
   "saved": "Saved.",
   "deleted": "Deleted.",
   "accounts.add": "Add an account",
-  "accounts.path": "Name (for example assets:bank:leumi)",
-  "accounts.currency.hint": "empty = a group for other accounts",
+  "accounts.currency.hint": "cannot change later",
   "accounts.opening": "Opening balance",
   "categories.add": "Add a category",
-  "categories.path": "Name (for example food:restaurants)",
   "categories.income": "Income category",
   "spending": "Spending",
   "income": "Income",
@@ -92,5 +90,11 @@
   "status": "Status",
   "line": "Line",
   "sync.warning": "Sync",
-  "error": "Error"
+  "error": "Error",
+  "accounts.name": "Name (for example Checking)",
+  "accounts.kind": "Kind",
+  "categories.name": "Name (for example Restaurants)",
+  "categories.in": "In",
+  "categories.top": "(top level)",
+  "categories.in.hint": "for an income category, write it in the name: salary:bonus"
 }

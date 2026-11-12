@@ -62,11 +62,13 @@ func (a Account) IsClosed() bool { return !a.ClosedOn.IsZero() }
 func ValidateName(name string) error {
 	switch {
 	case name == "":
-		return fmt.Errorf("account name has an empty level")
+		return fmt.Errorf("the name is empty")
 	case strings.TrimSpace(name) != name:
-		return fmt.Errorf("account name %q has spaces at the start or end", name)
-	case strings.ContainsAny(name, ":#=\n\t"):
-		return fmt.Errorf("account name %q contains a character that is not allowed (: # = or a tab)", name)
+		return fmt.Errorf("name %q has spaces at the start or end", name)
+	case strings.ContainsAny(name, ":#=;|\n\t"):
+		return fmt.Errorf("name %q contains a character that is not allowed (: # = ; | or a tab)", name)
+	case strings.Contains(name, "  "):
+		return fmt.Errorf("name %q has two spaces in a row; use one", name)
 	}
 	return nil
 }

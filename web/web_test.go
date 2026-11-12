@@ -31,7 +31,7 @@ func newServer(t *testing.T) (*Server, *app.App) {
 	a.Offline = true
 	a.SetClock(func() time.Time { return time.Date(2026, 11, 4, 12, 0, 0, 0, time.UTC) })
 	t.Cleanup(func() { _ = a.Close() })
-	if _, err := a.AddAccount(context.Background(), app.AddAccountParams{Path: "assets:bank:leumi", Currency: "ILS", Opening: "1000", OpeningDate: core.MustDate("2026-10-01")}); err != nil {
+	if _, err := a.AddAccount(context.Background(), app.AddAccountParams{Name: "assets:bank:leumi", Currency: "ILS", Opening: "1000", OpeningDate: core.MustDate("2026-10-01")}); err != nil {
 		t.Fatal(err)
 	}
 	s, err := New(a, addr, 1)
@@ -112,14 +112,14 @@ func TestSecurity(t *testing.T) {
 	})
 	// Changes need the CSRF token and must not come from another site.
 	t.Run("changes need csrf and same origin", func(t *testing.T) {
-		form := url.Values{"path": {"food:coffee"}}
+		form := url.Values{"name": {"coffee"}, "in": {"food"}}
 		if w := s.do(t, req{method: "POST", path: "/categories", cookie: true, form: form}); w.Code != http.StatusForbidden {
 			t.Fatalf("no csrf: %d", w.Code)
 		}
-		if w := s.do(t, req{method: "POST", path: "/categories", cookie: true, csrf: true, form: url.Values{"path": {"food:coffee"}}, origin: "https://evil.example"}); w.Code != http.StatusForbidden {
+		if w := s.do(t, req{method: "POST", path: "/categories", cookie: true, csrf: true, form: url.Values{"name": {"coffee"}, "in": {"food"}}, origin: "https://evil.example"}); w.Code != http.StatusForbidden {
 			t.Fatalf("other origin: %d", w.Code)
 		}
-		if w := s.do(t, req{method: "POST", path: "/categories", cookie: true, csrf: true, form: url.Values{"path": {"food:coffee"}}, origin: "http://" + addr}); w.Code != http.StatusSeeOther {
+		if w := s.do(t, req{method: "POST", path: "/categories", cookie: true, csrf: true, form: url.Values{"name": {"coffee"}, "in": {"food"}}, origin: "http://" + addr}); w.Code != http.StatusSeeOther {
 			t.Fatalf("valid: %d %s", w.Code, w.Body)
 		}
 	})
@@ -228,7 +228,7 @@ func TestPages(t *testing.T) {
 // the amount entered for the other account.
 func TestReviewTransfer(t *testing.T) {
 	s, a := newServer(t)
-	if _, err := a.AddAccount(context.Background(), app.AddAccountParams{Path: "liabilities:card:chase", Currency: "USD"}); err != nil {
+	if _, err := a.AddAccount(context.Background(), app.AddAccountParams{Name: "liabilities:card:chase", Currency: "USD"}); err != nil {
 		t.Fatal(err)
 	}
 	if _, _, err := a.AddRule(context.Background(), app.RuleParams{Pattern: "chase", Account: "liabilities:card:chase"}); err != nil {

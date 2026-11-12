@@ -54,7 +54,11 @@ moolah keeps track of your bank accounts, credit cards and retirement accounts i
 
 **Accounts** are real places that hold money: bank accounts, cash, credit cards, loans, pension funds. Each account has **one currency**, the currency of its statement. A US credit card is a USD account. A checking account at a German bank is a EUR account.
 
-**Categories** describe where money comes from or goes to: `food`, `rent`, `salary`. Categories can have subcategories (`food:restaurants`). A category has no currency. It can collect spending in any currency.
+**Every account has a kind**, such as `bank`, `card` or `pension`. The kind groups your accounts in lists and reports, and tells moolah whether the account is something you own or money you owe. You can add your own kinds.
+
+**Categories** describe where money comes from or goes to: `food`, `rent`, `salary`. A category can be in another one (`restaurants` is in `food`). A category has no currency. It can collect spending in any currency.
+
+**Names are unique.** No two accounts have the same name, and no two spending (or income) categories do. So the name alone is always enough: `moolah add checking -85 restaurants`.
 
 **Every transaction moves money from one place to another.** Buying groceries moves money from your bank account to the `food` category. Paying your credit card moves money from your bank account to the card. moolah records both sides, so totals always add up. (Inside, moolah uses double-entry bookkeeping. You don't need to know it to use moolah.)
 
@@ -87,17 +91,17 @@ moolah completion zsh  > "${fpath[1]}/_moolah"                               # z
 #    encryption key and (optionally) a sync folder for other machines.
 moolah init
 
-# 2. Add your real accounts with their opening balances.
-moolah account add assets:bank:checking   --currency EUR --opening 25000 --date 2026-11-01
-moolah account add liabilities:card:visa --currency EUR
-moolah account add liabilities:card:chase --currency USD
+# 2. Add your accounts: a name, a kind and a currency, and an opening balance.
+moolah account add Checking --kind bank --currency EUR --opening 25000 --date 2026-11-01
+moolah account add Visa --kind card --currency EUR
+moolah account add Chase --kind card --currency USD
 
 # 3. moolah init created starter categories. Look at them, and add your own.
 moolah category list
-moolah category add food:coffee
+moolah category add coffee --in food
 
 # 4. Record a purchase.
-moolah add card:visa -85 restaurants --payee "Corner Cafe"
+moolah add visa -85 restaurants --payee "Corner Cafe"
 
 # 5. See your balances in your base currency.
 moolah balance
@@ -105,45 +109,67 @@ moolah balance
 
 ## Accounts
 
-An account name has a type, then one or more levels, separated by `:`.
-
-| Type | Use for | Examples |
-|---|---|---|
-| `assets` | things you own | `assets:bank:checking`, `assets:cash`, `assets:invest:pension` |
-| `liabilities` | money you owe | `liabilities:card:visa`, `liabilities:mortgage` |
+An account has a **name**, a **kind** and a **currency**.
 
 ```sh
-moolah account add assets:bank:checking --currency EUR
-moolah account add assets:bank:checking --currency EUR --opening 25000 --date 2026-11-01
+moolah account add Checking --kind bank --currency EUR
+moolah account add Checking --kind bank --currency EUR --opening 25000 --date 2026-11-01
+moolah account add "Visa Gold" --kind card --currency USD
 moolah account list
-moolah account rename assets:bank:checking assets:bank:main-checking
-moolah account merge assets:cash:wallet assets:cash      # moves all history, then removes the first
-moolah account close liabilities:card:old --date 2026-10-31
+moolah account rename checking "Main checking"
+moolah account merge wallet "Pocket cash"            # moves all history, then removes wallet
+moolah account close "Old card" --date 2026-10-31
 ```
 
-- `--currency` cannot change later. An account **without** `--currency` is a **group** that only holds other accounts (like `assets:bank`, which `moolah init` creates). A group cannot receive transactions.
+- **The name must be new.** Upper and lower case do not matter (`checking` is `Checking`). Names can have spaces; put them in quotes in the shell. A name cannot contain `:`, `#`, `=`, `;` or `|`.
+- **The currency cannot change later.** It is the currency of the account's statement. In a terminal, moolah asks for it, with your base currency as the default.
 - The **opening balance** is the balance on the day you start using moolah for this account.
-- A parent level must exist before a child. `moolah init` creates the top levels.
 - You cannot delete an account that has transactions. Merge it into another account, or close it. A closed account keeps its history but accepts no new transactions after the close date.
-- **Short names** work everywhere when they are unique: `checking` means `assets:bank:checking`.
+
+**Kinds of account.** `moolah init` creates these kinds:
+
+| Kind | Type | For |
+|---|---|---|
+| `bank` | asset | checking and savings accounts |
+| `cash` | asset | a wallet, cash at home |
+| `investment` | asset | brokerage accounts, funds |
+| `pension` | asset | pension funds, retirement accounts (401(k), IRA) |
+| `card` | liability | credit cards |
+| `loan` | liability | loans, a mortgage |
+
+Add your own kind with `--asset` (something you own) or `--liability` (money you owe):
+
+```sh
+moolah account kind add crypto --asset
+moolah account kind add mortgage --liability
+moolah account kind list                     # kinds, with how many accounts each has
+moolah account kind rename crypto "digital assets"
+moolah account kind remove crypto            # only when it has no accounts
+```
+
+A kind's name is also unique: you cannot call an account `cash` while the kind `cash` exists. Call it `Wallet`, for example.
+
+**Full names.** Inside, moolah keeps accounts in a tree: `assets:bank:checking` is the account `checking` of kind `bank`, under `assets`. You see this full name in exports and in CSV and JSON output. You can also type it instead of `--kind`: `moolah account add assets:bank:checking --currency EUR`. A full name in `account rename` moves the account to another kind: `moolah account rename checking assets:investment:checking`.
 
 **Sign of balances:** a negative balance on a card or loan means you owe money. A purchase on a card makes the card balance more negative.
 
 ## Categories
 
-Categories are for spending (`expenses`) and earnings (`income`). You write them without the type prefix.
+Categories are for spending and for income.
 
 ```sh
 moolah category list                       # tree of all categories
-moolah category add food                   # spending category
-moolah category add food:coffee            # subcategory of food
-moolah category add salary --income        # income category
-moolah category rename food:restuarants food:restaurants
+moolah category add pets                   # spending category
+moolah category add coffee --in food       # a category in food
+moolah category add bonus --in salary --income   # income category
+moolah category rename restuarants restaurants
 moolah category merge snacks food          # moves all history from snacks to food
-moolah category close hobbies:golf --date 2026-12-31
+moolah category close golf --date 2026-12-31
 ```
 
-- A subcategory's spending is included in its parent's total. Reports can show only the top level (`--depth 1`).
+- **The name must be new** among the spending categories (or among the income categories). The same name can be both a spending and an income category, like `gifts` (gifts you give and gifts you get).
+- A path also works: `moolah category add food:coffee` is `coffee` in `food`. A path in `category rename` moves the category: `moolah category rename coffee drinks:coffee`.
+- A category's spending is included in the total of the category it is in. Reports can show only the top level (`--depth 1`).
 - You can record directly on a parent (`food`) if no subcategory fits.
 - A name that doesn't exist is an **error** with suggestions:
   ```
@@ -160,7 +186,7 @@ moolah category close hobbies:golf --date 2026-12-31
 moolah add <account> <amount> <category> [--date YYYY-MM-DD] [--payee TEXT] [--note TEXT]
 
 moolah add checking -200 food:groceries --payee "Supermarket"
-moolah add card:visa -85 restaurants --date 2026-11-02
+moolah add visa -85 restaurants --date 2026-11-02
 moolah add checking 18500 salary --payee "Employer Ltd"        # income: positive amount
 ```
 
@@ -169,8 +195,8 @@ The date is today if you don't give one. The amount is in the account's currency
 **A transfer between two of your accounts** (including paying a credit card):
 
 ```sh
-moolah transfer checking card:visa 3200                        # pay the Visa card from checking
-moolah transfer checking assets:bank:savings 5000 --date 2026-11-10
+moolah transfer checking visa 3200                        # pay the Visa card from checking
+moolah transfer checking savings 5000 --date 2026-11-10
 ```
 
 **A transaction with more than two lines** (for example, a split purchase):
@@ -187,8 +213,8 @@ The lines must add up to zero in each currency, or moolah rejects the transactio
 **Tags** group transactions across categories, for example everything for one trip:
 
 ```sh
-moolah add card:visa -1840 travel:flights --tag vacation-2026
-moolah add card:chase -96 restaurants --tag vacation-2026
+moolah add visa -1840 flights --tag vacation-2026
+moolah add chase -96 restaurants --tag vacation-2026
 moolah report income --tag vacation-2026        # what did the trip cost?
 moolah tag list
 ```
@@ -211,11 +237,11 @@ moolah history --tx <transaction-id>     # every version of the transaction
 
 | Situation | What to enter |
 |---|---|
-| USD purchase on a US card | `moolah add card:chase -42.17 shopping` (USD, because the account is USD) |
-| EUR purchase on a US card | the **USD amount the card charged**: `moolah add card:chase -41.30 travel --note "38 EUR"` |
+| USD purchase on a US card | `moolah add chase -42.17 shopping` (USD, because the account is USD) |
+| EUR purchase on a US card | the **USD amount the card charged**: `moolah add chase -41.30 travel --note "38 EUR"` |
 | Foreign purchase on a card in your own currency | the **amount the card charged**, in the card's currency. Import stores the original amount for you. |
-| Pay a USD card from a EUR account | `moolah transfer checking card:chase 390 --to-amount 420` (390 € left the checking account; the card got 420 $) |
-| A transfer with a bank fee | `moolah transfer checking card:chase 390 --to-amount 420 --fee 5` (fee goes to `fees`) |
+| Pay a USD card from a EUR account | `moolah transfer checking chase 390 --to-amount 420` (390 € left the checking account; the card got 420 $) |
+| A transfer with a bank fee | `moolah transfer checking chase 390 --to-amount 420 --fee 5` (fee goes to `fees`) |
 
 When a transfer has two currencies, moolah saves the rate you actually got (here 390 ÷ 420 = 0.929 EUR per USD). Reports can compare it with the official rate, which shows how much the bank charged for the conversion.
 
@@ -224,7 +250,7 @@ When a transfer has two currencies, moolah saves the rate you actually got (here
 Most data should come from your bank and card exports, not from typing.
 
 ```sh
-moolah import ~/Downloads/visa-2026-10.xlsx --account card:visa
+moolah import ~/Downloads/visa-2026-10.xlsx --account visa
 ```
 
 1. **moolah reads the file.** CSV, XLSX, and HTML tables saved as .xls are supported, in any language, including exports with title rows and total rows. Files that are not UTF-8 are read with the encoding the profile names (default Windows-1252).
@@ -251,8 +277,8 @@ Rules are checked in order. The first match wins. During `moolah review`, you ca
 **Payments between your own accounts.** A rule can point to one of your accounts instead of a category. Then the row is a transfer, not spending:
 
 ```sh
-moolah rule add 'visa payment' liabilities:card:visa     # in the bank export
-moolah rule add 'payment thank you' assets:bank:checking # in the card export
+moolah rule add 'visa payment' visa     # in the bank export
+moolah rule add 'payment thank you' checking # in the card export
 ```
 
 The payment appears in both exports, but moolah records it once: the row from the second file is linked to the transfer that the first file created (same accounts, same amount, at most 5 days apart).
@@ -322,14 +348,14 @@ Other commands: `moolah profile list`, `moolah profile export my-bank > my-bank.
 For pension funds and retirement savings plans (401(k), IRA, and similar), you usually only know the total value from the statement. moolah tracks the value and calculates the gain.
 
 ```sh
-moolah account add assets:invest:pension     --currency EUR --opening 380000 --date 2026-01-01
-moolah account add assets:invest:401k        --currency USD --opening 52000  --date 2026-01-01
+moolah account add "Pension fund" --kind pension --currency EUR --opening 380000 --date 2026-01-01
+moolah account add 401k           --kind pension --currency USD --opening 52000  --date 2026-01-01
 
 # Deposits are normal transactions, so they are not counted as gains:
-moolah add assets:invest:pension 2400 salary:pension --date 2026-02-10 --payee "Employer deposit"
+moolah add "pension fund" 2400 salary:pension --date 2026-02-10 --payee "Employer deposit"
 
 # When a statement arrives, enter the value:
-moolah value pension 412300 --date 2026-10-31
+moolah value "pension fund" 412300 --date 2026-10-31
 ```
 
 `moolah value` compares the value with the account balance and records only the difference as investment gain or loss (`income:invest:gains`). So:
@@ -377,7 +403,7 @@ moolah report networth --from 2026-01-01 --to 2026-10-31
 moolah report income --month 2026-10            # income and spending for a month
 moolah report income --from 2026-01-01 --depth 1    # top-level categories only
 
-moolah register card:chase --from 2026-10-01    # list of transactions
+moolah register chase --from 2026-10-01    # list of transactions
 
 moolah report income --month 2026-10 --by charge-date   # card purchases by billing month
 ```
@@ -407,7 +433,7 @@ Net worth 2026-10-31                    460,450 €
 Check that moolah agrees with your bank or card statement:
 
 ```sh
-moolah reconcile card:visa --balance -4210.50 --date 2026-10-31
+moolah reconcile visa --balance -4210.50 --date 2026-10-31
 ```
 
 If the balances are different, moolah lists the transactions near that date that may be missing or duplicated.

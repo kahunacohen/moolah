@@ -61,11 +61,14 @@ A personal money manager for one user who is comfortable on the command line.
 
 ## 2. Closed category taxonomy
 - Accounts are created only with explicit commands. Postings refer to `accounts.id` through a FK.
-  - `moolah account add assets:bank:leumi --currency ILS`: real accounts; `--currency` is required. Only `assets:` and `liabilities:` are allowed.
-  - `moolah category add food:restaurants`: creates `expenses:food:restaurants`; `--income` creates under `income:` instead. No currency. `category list|rename|merge|close` show and accept names **without** the `expenses:`/`income:` prefix.
+- **Users see names, not paths.** Paths with `:` are accounting-software notation; a person thinks "my checking account". So:
+  - **Names are unique** (ignoring case) among accounts (assets and liabilities together, kinds included), among spending categories, and among income categories. A unique index (`accounts_name`) enforces it. So a name alone always identifies an account or category.
+  - `moolah account add Checking --kind bank --currency EUR`: the **kind** is a group directly under assets or liabilities. Built-in kinds are the starter groups (bank, cash, investment, pension; card, loan); `account kind add|list|rename|remove` manages them. The kind decides asset vs liability, so users never need to know those words except when adding a kind (`--asset` / `--liability`). `--currency` is required (asked in a terminal, default the base currency): the currency cannot change, so it is never assumed silently.
+  - `moolah category add Restaurants --in food`; `--income` for income categories. No currency.
+  - Paths still work everywhere as an expert shortcut (`account add assets:bank:checking`, `category add food:coffee`), and are used in exports and CSV/JSON. A path in `rename` moves; a plain name renames in place.
   - Both commands call the same `app` use case; the user never needs to know that categories are accounts. The web UI uses the same split: an "Accounts" page and a "Categories" page.
 - 5 fixed roots (assets, liabilities, income, expenses, equity), enforced with `CHECK`. A parent must exist before its child.
-- An unknown name is an error with "did you mean" suggestions. A short name (`food`) works only if exactly one leaf matches.
+- An unknown name is an error with "did you mean" suggestions.
 - `account rename` / `merge A into B` / `close --date`. An account that has postings cannot be deleted.
 - `moolah init` seeds a small starter tree. Import rules may name only existing accounts; rows with no match go to `expenses:uncategorized` → `moolah review`.
 

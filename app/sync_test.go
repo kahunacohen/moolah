@@ -43,7 +43,7 @@ func twoMachines(t *testing.T) (a, b *machine, dir string) {
 	}
 	appA.SetClock(clock)
 	mustDo(t, func() error {
-		_, err := appA.AddAccount(ctx, AddAccountParams{Path: "assets:bank:leumi", Currency: "ILS", Opening: "1000", OpeningDate: core.MustDate("2026-10-01")})
+		_, err := appA.AddAccount(ctx, AddAccountParams{Name: "assets:bank:leumi", Currency: "ILS", Opening: "1000", OpeningDate: core.MustDate("2026-10-01")})
 		return err
 	})
 	mustDo(t, func() error { return appA.SyncInit(ctx, dir, "") })

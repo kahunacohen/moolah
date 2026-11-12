@@ -43,7 +43,10 @@ CREATE TABLE accounts (
 	closed_on TEXT,
 	CHECK (currency IS NULL OR type IN ('assets','liabilities'))
 );
-CREATE UNIQUE INDEX accounts_parent_name ON accounts(ifnull(parent_id, 0), name);
+-- A name is unique among accounts (assets and liabilities together, kinds included),
+-- among spending categories, and among income categories, so a name alone is enough.
+CREATE UNIQUE INDEX accounts_name ON accounts(CASE WHEN type IN ('assets','liabilities') THEN 'accounts' ELSE type END, name)
+	WHERE parent_id IS NOT NULL;
 CREATE UNIQUE INDEX accounts_root_type ON accounts(type) WHERE parent_id IS NULL;
 
 CREATE TABLE transactions (

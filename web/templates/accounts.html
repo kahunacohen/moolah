@@ -13,8 +13,11 @@
 <h2>{{.T "accounts.add"}}</h2>
 <form class="grid" method="post" action="/accounts">
   {{template "csrf" .}}
-  <label for="path">{{.T "accounts.path"}}</label><input id="path" name="path" required value="{{.Data.Form.path}}">
-  <label for="currency">{{.T "currency"}}</label><input id="currency" name="currency" size="4" value="{{.Data.Form.currency}}">
+  <label for="name">{{.T "accounts.name"}}</label><input id="name" name="name" required value="{{.Data.Form.name}}">
+  <label for="kind">{{.T "accounts.kind"}}</label><select id="kind" name="kind" required>
+    {{range .Data.Kinds}}<option value="{{.Name}}" {{if eq .Name $.Data.Form.kind}}selected{{end}}>{{.Name}}</option>{{end}}
+  </select>
+  <label for="currency">{{.T "currency"}}</label><input id="currency" name="currency" size="4" required value="{{.Data.Form.currency}}">
   <span class="hint">{{.T "accounts.currency.hint"}}</span>
   <label for="opening">{{.T "accounts.opening"}}</label><input id="opening" name="opening" class="amount" value="{{.Data.Form.opening}}">
   <label for="date">{{.T "date"}}</label><input id="date" name="date" type="date" value="{{.Data.Form.date}}">

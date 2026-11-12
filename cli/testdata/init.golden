@@ -3,7 +3,7 @@ Created the encryption key $TMP/config/age-key.txt. Keep a copy somewhere safe; 
 This book syncs through $FOLDER.
 Book "main" is ready in $TMP/data/books/main.db (base currency EUR).
 Next: add your accounts, for example:
-  moolah account add assets:bank:mybank --currency EUR --opening 1000
+  moolah account add Checking --kind bank --currency EUR --opening 1000
   moolah category list
 Do you already use moolah on another computer? [y/N]: Base currency (ISO code, for example USD, EUR, GBP): Language and number format (for example en_US, de_DE, he_IL) [en_US]: Sync folder for your other computers (Enter to skip; add one later with: moolah sync init <folder>): Encryption key for backups and sync: 'new' (create one), 'ssh' (~/.ssh/id_ed25519.pub), a public key, or 'none' (a passphrase each time) [new]: 
 [desktop] $ moolah init    # answers: y | $EMPTY

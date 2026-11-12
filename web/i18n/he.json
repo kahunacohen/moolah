@@ -44,11 +44,9 @@
   "saved": "נשמר.",
   "deleted": "נמחק.",
   "accounts.add": "הוספת חשבון",
-  "accounts.path": "שם (לדוגמה assets:bank:leumi)",
-  "accounts.currency.hint": "ריק = קבוצה של חשבונות",
+  "accounts.currency.hint": "לא ניתן לשנות אחר כך",
   "accounts.opening": "יתרת פתיחה",
   "categories.add": "הוספת קטגוריה",
-  "categories.path": "שם (לדוגמה food:restaurants)",
   "categories.income": "קטגוריית הכנסה",
   "spending": "הוצאות",
   "income": "הכנסות",
@@ -92,5 +90,11 @@
   "status": "מצב",
   "line": "שורה",
   "sync.warning": "סנכרון",
-  "error": "שגיאה"
+  "error": "שגיאה",
+  "accounts.name": "שם (לדוגמה עו\"ש)",
+  "accounts.kind": "סוג",
+  "categories.name": "שם (לדוגמה מסעדות)",
+  "categories.in": "בתוך",
+  "categories.top": "(רמה עליונה)",
+  "categories.in.hint": "לקטגוריית הכנסה, כתבו בשם: salary:bonus"
 }

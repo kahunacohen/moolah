@@ -117,17 +117,17 @@ func TestScenarios(t *testing.T) {
 	t.Run("everyday", func(t *testing.T) {
 		s := newSession(t)
 		s.run("init --base ILS --no-backup-key")
-		s.run("account add assets:bank:leumi --currency ILS --opening 25000 --date 2026-10-01")
-		s.run("account add liabilities:card:chase --currency USD")
-		s.run("account add assets:invest:pension --currency ILS --opening 380000 --date 2026-01-01")
+		s.run("account add leumi --kind bank --currency ILS --opening 25000 --date 2026-10-01")
+		s.run("account add chase --kind card --currency USD")
+		s.run("account add harel --kind pension --currency ILS --opening 380000 --date 2026-01-01")
 		s.run(`add leumi -200 food:groceries --payee Shufersal --date 2026-10-03`)
-		s.run(`add card:chase -42.17 shopping --payee Amazon --date 2026-10-05 --tag vacation-2026`)
+		s.run(`add chase -42.17 shopping --payee Amazon --date 2026-10-05 --tag vacation-2026`)
 		s.run("add leumi -85 restaurnts")
 		s.run("add leumi -85 food")
 		s.run("add --payee Super-Pharm --date 2026-10-20 --posting leumi=-300 --posting health=180 --posting household=120")
-		s.run("transfer leumi card:chase 1530 --to-amount 420 --fee 15 --date 2026-11-01")
-		s.run("add pension 2400 salary:pension --date 2026-02-10")
-		s.run("value pension 390000 --date 2026-10-31")
+		s.run("transfer leumi chase 1530 --to-amount 420 --fee 15 --date 2026-11-01")
+		s.run("add harel 2400 salary:pension --date 2026-02-10")
+		s.run("value harel 390000 --date 2026-10-31")
 		s.run("rates add 2026-10-01 USD ILS 3.70")
 		s.run("rates add 2026-11-02 USD ILS 3.80")
 		s.run("balance --date 2026-10-31")
@@ -158,7 +158,7 @@ func TestScenarios(t *testing.T) {
 		s := newSession(t)
 		writeMachineID(t, s, "laptop-1a2b")
 		s.run("init --base ILS --no-backup-key")
-		s.run("account add assets:bank:leumi --currency ILS --opening 1000 --date 2026-10-01")
+		s.run("account add leumi --kind bank --currency ILS --opening 1000 --date 2026-10-01")
 		s.run("add leumi -50 food --date 2026-10-02 --payee Cafe --tag trip")
 		s.run("category rename food eat")
 		s.run("rule add cafe eat")
@@ -180,13 +180,13 @@ func TestScenarios(t *testing.T) {
 	t.Run("export", func(t *testing.T) {
 		s := newSession(t)
 		s.run("init --base ILS --no-backup-key")
-		s.run("account add assets:bank:leumi --currency ILS --opening 25000 --date 2026-10-01")
-		s.run("account add liabilities:card:chase --currency USD")
-		s.run("account add assets:invest:pension --currency ILS --opening 380000 --date 2026-10-01")
+		s.run("account add leumi --kind bank --currency ILS --opening 25000 --date 2026-10-01")
+		s.run("account add chase --kind card --currency USD")
+		s.run("account add harel --kind pension --currency ILS --opening 380000 --date 2026-10-01")
 		s.run("add leumi -200 food --date 2026-10-03 --payee Shufersal --note weekly --tag trip")
-		s.run("transfer leumi card:chase 1530 --to-amount 420 --fee 15 --date 2026-11-01")
-		s.run("add card:chase -42.17 shopping --date 2026-11-02 --payee Amazon")
-		s.run("value pension 390000 --date 2026-10-31")
+		s.run("transfer leumi chase 1530 --to-amount 420 --fee 15 --date 2026-11-01")
+		s.run("add chase -42.17 shopping --date 2026-11-02 --payee Amazon")
+		s.run("value harel 390000 --date 2026-10-31")
 		s.run("rates add 2026-10-31 USD ILS 3.65")
 		s.run("rule add amazon shopping")
 		dir := filepath.Join(filepath.Dir(s.env.DataDir), "export")
@@ -210,7 +210,7 @@ func TestScenarios(t *testing.T) {
 		if err != nil {
 			t.Fatalf("hledger: %v\n%s", err, out)
 		}
-		for _, want := range []string{"23255.00 ILS  assets:bank:leumi", "390000.00 ILS  assets:invest:pension", "377.83 USD  liabilities:card:chase"} {
+		for _, want := range []string{"23255.00 ILS  assets:bank:leumi", "390000.00 ILS  assets:pension:harel", "377.83 USD  liabilities:card:chase"} {
 			if !strings.Contains(strings.Join(strings.Fields(string(out)), " "), strings.Join(strings.Fields(want), " ")) {
 				t.Errorf("hledger balance lacks %q:\n%s", want, out)
 			}
@@ -221,17 +221,33 @@ func TestScenarios(t *testing.T) {
 	t.Run("taxonomy", func(t *testing.T) {
 		s := newSession(t)
 		s.run("init --base ILS --no-backup-key")
-		s.run("account add assets:bank:leumi --currency ILS --opening 1000 --date 2026-10-01")
-		s.run("category add food:restuarants")
+		s.run("account add leumi --kind bank --currency ILS --opening 1000 --date 2026-10-01")
+		// Names are unique (ignoring case), also against kinds, so a name alone is enough.
+		s.run("account add Leumi --kind bank --currency ILS")
+		s.run("account add cash --kind cash --currency ILS")
+		s.run("account add savings --currency ILS")
+		s.run("account add savings --kind bnak --currency ILS")
+		s.run("account add savings --kind bank")
+		// In a terminal, moolah asks for what is missing; the currency defaults to the base currency.
+		s.answers = "bank\n\n"
+		s.run("account add savings")
+		s.run("account kind add crypto --asset")
+		s.run("account add wallet --kind crypto --currency USD")
+		s.run("account kind remove crypto")
+		s.run("account kind rename crypto digital")
+		s.run("account kind list")
+		s.run("category add restuarants --in food")
 		s.run("category add nosuch:child")
+		s.run("category add Groceries")
 		s.run("add leumi -50 restuarants --date 2026-10-02")
-		s.run("category rename food:restuarants food:eating-out")
+		s.run("category rename restuarants eating-out")
 		s.run("register --category eating-out")
-		s.run("category merge eating-out food:restaurants")
-		s.run("register --category food:restaurants")
-		s.run("account close leumi --date 2026-10-31")
-		s.run("add pension 100 food")
-		s.run("category add salary:bonus --income")
+		s.run("category merge eating-out restaurants")
+		s.run("register --category restaurants")
+		s.run("account rename leumi checking")
+		s.run("account close checking --date 2026-10-31")
+		s.run("add salary 100 food")
+		s.run("category add bonus --in salary --income")
 		s.run("account list")
 		s.golden("taxonomy")
 	})
@@ -268,7 +284,7 @@ func TestImportScenario(t *testing.T) {
 		write("oct.csv", "Date,Description,Amount\n2026-10-01,SHUFERSAL DEAL 1234,-200.00\n2026-10-02,Coffee,-12\n2026-10-02,Coffee,-12\n2026-10-05,Salary,18500\n")
 		write("oct-nov.csv", "Date,Description,Amount\n2026-10-05,Salary,18500\n2026-11-01,SHUFERSAL DEAL 9876,-150.00\n")
 		s.run("init --base ILS --no-backup-key")
-		s.run("account add assets:bank:leumi --currency ILS --opening 1000 --date 2026-09-30")
+		s.run("account add leumi --kind bank --currency ILS --opening 1000 --date 2026-09-30")
 		s.run("profile list")
 		s.run("import " + filepath.Join(dir, "oct.csv"))
 		s.run("import test " + filepath.Join(dir, "oct.csv") + " --account leumi")
@@ -300,8 +316,8 @@ func TestImportScenario(t *testing.T) {
 		write("bank.csv", "Date,Description,Amount\n2026-11-02,CHASE PAYMENT,-1100.00\n")
 		write("card.csv", "Date,Description,Amount\n2026-11-04,PAYMENT THANK YOU,1200.00\n")
 		s.run("init --base EUR --no-backup-key")
-		s.run("account add assets:bank:checking --currency EUR --opening 5000 --date 2026-10-31")
-		s.run("account add liabilities:card:chase --currency USD")
+		s.run("account add checking --kind bank --currency EUR --opening 5000 --date 2026-10-31")
+		s.run("account add chase --kind card --currency USD")
 		s.run("rule add chase liabilities:card:chase")
 		s.run("rule add thank assets:bank:checking")
 		s.run("import " + filepath.Join(dir, "bank.csv") + " --account checking")
@@ -364,7 +380,7 @@ func TestSyncScenario(t *testing.T) {
 			log.WriteString("[" + who + "] " + strings.ReplaceAll(s.log.String(), folder, "$FOLDER"))
 		}
 		step(laptop, "laptop", "init --base ILS --sync-dir $FOLDER")
-		step(laptop, "laptop", "account add assets:bank:leumi --currency ILS --opening 1000 --date 2026-10-01")
+		step(laptop, "laptop", "account add leumi --kind bank --currency ILS --opening 1000 --date 2026-10-01")
 		key, err := os.ReadFile(laptop.env.KeyFile())
 		if err != nil {
 			t.Fatal(err)
@@ -409,7 +425,7 @@ func TestEditFormat(t *testing.T) {
 		{ID: 1, Name: "assets", Type: core.Assets},
 		{ID: 2, Name: "leumi", ParentID: 1, Type: core.Assets, Currency: "ILS"},
 		{ID: 3, Name: "liabilities", Type: core.Liabilities},
-		{ID: 4, Name: "chase", ParentID: 3, Type: core.Liabilities, Currency: "USD"},
+		{ID: 4, Name: "Visa Gold", ParentID: 3, Type: core.Liabilities, Currency: "USD"},
 		{ID: 5, Name: "expenses", Type: core.Expenses},
 		{ID: 6, Name: "food", ParentID: 5, Type: core.Expenses},
 	})
@@ -426,7 +442,8 @@ func TestEditFormat(t *testing.T) {
 			{AccountID: 4, Amount: dec("420 USD"), Cost: func() *core.Amount { c := dec("1530 ILS"); return &c }()},
 		}}
 
-	// What the editor shows must read back as the same transaction, including the cost.
+	// What the editor shows must read back as the same transaction, including the
+	// cost and an account name with a space.
 	t.Run("round trip", func(t *testing.T) {
 		got, err := parseTx(tree, formatTx(tree, orig), orig)
 		if err != nil {

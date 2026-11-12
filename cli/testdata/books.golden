@@ -1,7 +1,7 @@
 $ moolah init --base ILS --no-backup-key
 Book "main" is ready in $TMP/data/books/main.db (base currency ILS).
 Next: add your accounts, for example:
-  moolah account add assets:bank:mybank --currency ILS --opening 1000
+  moolah account add Checking --kind bank --currency ILS --opening 1000
   moolah category list
 
 $ moolah book add mom --base USD --no-backup-key

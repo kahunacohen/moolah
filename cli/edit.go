@@ -112,14 +112,15 @@ func parseTx(tree *core.Tree, text string, orig core.Transaction) (core.Transact
 func parsePostingLine(tree *core.Tree, line string) (core.Posting, error) {
 	main, cost, hasCost := strings.Cut(line, "@@")
 	f := strings.Fields(main)
-	if len(f) != 3 {
+	if len(f) < 3 {
 		return core.Posting{}, fmt.Errorf("expected <account> <amount> <currency>, got %q", strings.TrimSpace(main))
 	}
-	acct, err := tree.Resolve(f[0], nil)
+	// An account name may contain single spaces ("Visa Gold"); the last two fields are the amount.
+	acct, err := tree.Resolve(strings.Join(f[:len(f)-2], " "), nil)
 	if err != nil {
 		return core.Posting{}, err
 	}
-	amt, err := parseAmountCurrency(f[1], f[2])
+	amt, err := parseAmountCurrency(f[len(f)-2], f[len(f)-1])
 	if err != nil {
 		return core.Posting{}, err
 	}
