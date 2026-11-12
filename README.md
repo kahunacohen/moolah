@@ -25,24 +25,25 @@ moolah keeps track of your bank accounts, credit cards and retirement accounts i
 14. [The browser UI](#the-browser-ui)
 15. [Languages and right-to-left text](#languages-and-right-to-left-text)
 16. [Backups](#backups)
-17. [Working on different machines](#working-on-different-machines)
-18. [Several sets of books](#several-sets-of-books)
-19. [Common errors](#common-errors)
+17. [History of changes](#history-of-changes)
+18. [Working on different machines](#working-on-different-machines)
+19. [Several sets of books](#several-sets-of-books)
+20. [Common errors](#common-errors)
 
 **Operations**
-20. [Requirements and building](#requirements-and-building)
-21. [Files and locations](#files-and-locations)
-22. [Settings](#settings)
-23. [Security model](#security-model)
-24. [Network access](#network-access)
-25. [Backup and restore in detail](#backup-and-restore-in-detail)
-26. [How sync works](#how-sync-works)
-27. [Upgrades and database migrations](#upgrades-and-database-migrations)
-28. [Scheduled tasks](#scheduled-tasks)
-29. [Data integrity and direct SQL access](#data-integrity-and-direct-sql-access)
-30. [Troubleshooting](#troubleshooting)
-31. [Development](#development)
-32. [License](#license)
+21. [Requirements and building](#requirements-and-building)
+22. [Files and locations](#files-and-locations)
+23. [Settings](#settings)
+24. [Security model](#security-model)
+25. [Network access](#network-access)
+26. [Backup and restore in detail](#backup-and-restore-in-detail)
+27. [How sync works](#how-sync-works)
+28. [Upgrades and database migrations](#upgrades-and-database-migrations)
+29. [Scheduled tasks](#scheduled-tasks)
+30. [Data integrity and direct SQL access](#data-integrity-and-direct-sql-access)
+31. [Troubleshooting](#troubleshooting)
+32. [Development](#development)
+33. [License](#license)
 
 ---
 
@@ -200,6 +201,7 @@ moolah register checking                    # transactions of one account, with 
 moolah register --category food --from 2026-10-01
 moolah edit <transaction-id>             # opens the transaction in $EDITOR
 moolah delete <transaction-id>
+moolah history --tx <transaction-id>     # every version of the transaction
 ```
 
 ## Foreign currencies
@@ -416,7 +418,7 @@ moolah serve
 moolah running at http://127.0.0.1:41873/?token=…   (Ctrl+C to stop)
 ```
 
-Your browser opens automatically. The browser UI has the same features as the command line: transactions, adding and editing, review of imports, accounts, categories and reports. It uses the same data, so you can use the command line and the browser at the same time.
+Your browser opens automatically. The browser UI has the same features as the command line: transactions, adding and editing, review of imports, accounts, categories and reports. History is only on the command line for now. It uses the same data, so you can use the command line and the browser at the same time.
 
 - The server is only reachable from your own computer.
 - `--port 8080` uses a fixed port. `--no-browser` doesn't open a browser.
@@ -441,7 +443,38 @@ moolah restore moolah-2026-11-04.db.age
 
 Backups are encrypted with the key you chose in `moolah init`, or with a passphrase if you chose none. **If you lose the key or the passphrase, the backup cannot be opened.** See [Backup and restore in detail](#backup-and-restore-in-detail).
 
-## Working on different machines
+## History of changes
+
+moolah keeps every change to your book: what changed, when, on which computer, and with which command. A change in the browser is kept too.
+
+```
+$ moolah history
+ID  Time              Computer     Command                    Changes
+ 7  2026-11-04 12:00  laptop-1a2b  delete 2 --yes             1 transaction deleted
+ 6  2026-11-04 11:58  laptop-1a2b  config set locale de_DE    1 setting changed
+ 4  2026-11-04 11:52  laptop-1a2b  category rename food eat   1 category changed
+
+$ moolah history 7                          # exactly what action 7 changed
+Action 7  2026-11-04 12:00  on laptop-1a2b
+  delete 2 --yes
+
+  transaction 2 deleted
+    date: 2026-10-02
+    payee: Cafe
+    - assets:bank:leumi  -50.00 ILS
+    - expenses:eat  50.00 ILS
+
+$ moolah history --tx 2                     # every action that changed transaction 2
+```
+
+- Each command is one action. An import is one action, and so is a change in the browser (shown as `browser: POST /tx/5`).
+- Changed fields are shown as `payee: Shufersal → Rami Levy`. Lines of a transaction that were added or removed are shown with `+` and `-`.
+- Account and category names are shown as they are **today**. After `category rename food eat`, older history shows `expenses:eat`.
+- History keeps transactions, accounts, categories, tags, settings, rules, import profiles and rate sources. Downloaded exchange rates are not kept: download them again.
+- History is in the book, so it moves with sync and is in your backups.
+- **Deleted data stays in history.** To really remove old data, delete the history before a date: `moolah history prune --before 2026-01-01`. Your data does not change. With sync, your other computers drop the same history.
+- moolah shows history; it does not undo it. To go back, look at what changed and do the opposite, or restore a backup.
+
 
 You can use moolah on several computers, for example a desktop at home and a laptop. moolah moves your data between them automatically, through a folder that you already sync with Dropbox, Syncthing, Google Drive, Nextcloud or a similar tool.
 
@@ -670,6 +703,7 @@ Your import profiles, rate sources, rules and categories are **book** data: they
 - **Do not put the live database in a cloud-sync folder** (Dropbox, Google Drive, and so on). Sync tools can damage an open SQLite file, and the file is not encrypted. Use moolah's own sync (`moolah sync init`), which puts only encrypted snapshots in the folder.
 - **The browser UI** listens only on `127.0.0.1`. It is protected against other websites and local programs by a random session token, a `Host` header check (against DNS rebinding) and an `Origin` check with CSRF tokens on every change.
 - moolah never asks for or stores bank passwords.
+- **Deleting a transaction does not remove it from the file**: the [history](#history-of-changes) keeps it. Use `moolah history prune` to remove old history.
 - An encrypted database file may be added in a later version.
 
 ## Network access
@@ -758,7 +792,7 @@ The database is a normal SQLite file, so you can query it directly:
 sqlite3 -readonly ~/.local/share/moolah/books/main.db
 ```
 
-Use read-only mode. Changing data with SQL skips moolah's rules. Make a backup first if you must.
+Use read-only mode. Changing data with SQL skips moolah's rules. Make a backup first if you must. History still keeps a change made with SQL, but without a time or command; `moolah history` says how many such changes there are.
 
 ## Troubleshooting
 

@@ -436,7 +436,7 @@ func (a *App) UpdateTransaction(ctx context.Context, t core.Transaction) error {
 
 // DeleteTransaction removes a transaction.
 func (a *App) DeleteTransaction(ctx context.Context, id int64) error {
-	err := a.st.DeleteTransaction(ctx, id)
+	err := a.st.InTx(ctx, func(tx *store.Tx) error { return tx.DeleteTransaction(ctx, id) })
 	if errors.Is(err, store.ErrNotFound) {
 		return fmt.Errorf("there is no transaction %d", id)
 	}

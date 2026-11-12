@@ -398,7 +398,7 @@ func (a *App) adopt(ctx context.Context, c *SyncConfig, s syncdir.Snapshot) erro
 	if err != nil {
 		return err
 	}
-	a.st = st
+	a.attach(st)
 	if replaceErr != nil {
 		return replaceErr
 	}

@@ -30,6 +30,7 @@ core        → nothing in this module (pure: no I/O, no SQL, no time.Now)
 - No country, currency or rate source is hard-coded in Go. Rate sources and import profiles are TOML (built-ins in prices/sources and importers/profiles).
 - One user action = one DB transaction.
 - A schema upgrade keeps every row and every sync trigger (`store/migrate_test.go`, run from every older version).
+- Every change to user data is kept in history under one action. Write only inside `store.InTx` (app tests fail on a change outside it); every column of a kept table is in its history triggers (`store/migrate_test.go`).
 
 ## Conventions
 - Sign convention: amounts are from the account's point of view; negative = money leaves the account.
@@ -38,6 +39,6 @@ core        → nothing in this module (pure: no I/O, no SQL, no time.Now)
 - Settings: book settings in the database; only computer-specific ones (paths, offline, current book, sync setup) in `~/.config/moolah/config.toml`. Each key's place is in `app/settings.go`.
 - Errors shown to users are plain English and say how to fix the problem.
 - Comments only when they say something the code cannot. Exported identifiers get doc comments. Test files: a one-line file comment, and one comment per `t.Run` stating the invariant.
-- Schema changes: append a migration to `store/schema.go`; never edit or reorder a released one. Add rows for any new table to `seeds` in `store/migrate_test.go`. Read the rules above `migrations` before rebuilding a table (foreign keys stay on during migrations, so dropping a referenced table deletes rows).
+- Schema changes: append a migration to `store/schema.go`; never edit or reorder a released one. Add rows for any new table to `seeds` in `store/migrate_test.go`, and either history triggers or an entry in `notInHistory` there. Read the rules above `migrations` before rebuilding a table (foreign keys stay on during migrations, so dropping a referenced table deletes rows).
 - Golden files: `make golden` updates them. Review the diff before committing.
 - Never commit real bank exports or real financial data. Test data is made up or anonymized.

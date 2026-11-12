@@ -17,7 +17,10 @@ import (
 //     import_batches) runs their ON DELETE actions and deletes rows. Rebuild such a
 //     table only after changing migrate to turn foreign keys off first.
 //   - Rebuilding a table drops its indexes and change-counter triggers; create them again.
-//   - A new table needs rows in the upgrade test data (migrate_test.go).
+//   - Rebuilding a table also drops its history triggers; a new column needs new
+//     history triggers too (historyTriggers; migrate_test.go checks both).
+//   - A new table needs rows in the upgrade test data (migrate_test.go), and a
+//     decision whether its changes are kept in history.
 var migrations = []string{
 	// v1: the schema of the first release. Nothing before it was ever released.
 	`
@@ -32,7 +35,7 @@ CREATE TABLE settings (
 );
 
 CREATE TABLE accounts (
-	id        INTEGER PRIMARY KEY,
+	id        INTEGER PRIMARY KEY AUTOINCREMENT,
 	parent_id INTEGER REFERENCES accounts(id),
 	name      TEXT NOT NULL COLLATE NOCASE,
 	type      TEXT NOT NULL CHECK (type IN ('assets','liabilities','income','expenses','equity')),
@@ -44,7 +47,7 @@ CREATE UNIQUE INDEX accounts_parent_name ON accounts(ifnull(parent_id, 0), name)
 CREATE UNIQUE INDEX accounts_root_type ON accounts(type) WHERE parent_id IS NULL;
 
 CREATE TABLE transactions (
-	id          INTEGER PRIMARY KEY,
+	id          INTEGER PRIMARY KEY AUTOINCREMENT,
 	date        TEXT NOT NULL,
 	charge_date TEXT,
 	payee       TEXT NOT NULL DEFAULT '',
@@ -77,7 +80,7 @@ CREATE TABLE transaction_meta (
 );
 
 CREATE TABLE tags (
-	id   INTEGER PRIMARY KEY,
+	id   INTEGER PRIMARY KEY AUTOINCREMENT,
 	name TEXT NOT NULL UNIQUE COLLATE NOCASE
 );
 
@@ -116,7 +119,7 @@ CREATE TABLE profile_accounts (
 	PRIMARY KEY (profile, account_id)
 );
 CREATE TABLE import_batches (
-	id         INTEGER PRIMARY KEY,
+	id         INTEGER PRIMARY KEY AUTOINCREMENT,
 	account_id INTEGER NOT NULL REFERENCES accounts(id),
 	profile    TEXT NOT NULL,
 	file_name  TEXT NOT NULL,
@@ -151,7 +154,7 @@ CREATE TABLE transfer_rows (
 CREATE INDEX transfer_rows_target ON transfer_rows(target_id);
 
 CREATE TABLE rules (
-	id         INTEGER PRIMARY KEY,
+	id         INTEGER PRIMARY KEY AUTOINCREMENT,
 	position   INTEGER NOT NULL,
 	pattern    TEXT NOT NULL,
 	account_id INTEGER NOT NULL REFERENCES accounts(id),
@@ -159,7 +162,43 @@ CREATE TABLE rules (
 	max_amount TEXT,
 	tags       TEXT NOT NULL DEFAULT ''
 );
-` + changeCounter("settings", "accounts", "transactions", "postings", "transaction_meta", "tags", "transaction_tags",
+
+-- History: every change to user data, grouped by the user action that made it.
+-- The action of the running database transaction is the one row with open = 1.
+CREATE TABLE actions (
+	id      INTEGER PRIMARY KEY,
+	time    TEXT NOT NULL,
+	machine TEXT NOT NULL DEFAULT '',
+	command TEXT NOT NULL DEFAULT '',
+	open    INTEGER NOT NULL DEFAULT 1 CHECK (open IN (0, 1))
+);
+CREATE UNIQUE INDEX actions_open ON actions(open) WHERE open = 1;
+-- action_id is NULL for a change made outside moolah, for example with sqlite3.
+CREATE TABLE history (
+	id        INTEGER PRIMARY KEY,
+	action_id INTEGER REFERENCES actions(id) ON DELETE CASCADE,
+	tbl       TEXT NOT NULL,
+	row_key   TEXT NOT NULL,
+	op        TEXT NOT NULL CHECK (op IN ('insert','update','delete')),
+	old       TEXT,
+	new       TEXT
+);
+CREATE INDEX history_action ON history(action_id);
+CREATE INDEX history_row ON history(tbl, row_key);
+` + historyTriggers(
+		historyTable{"settings", "key", []string{"key", "value"}},
+		historyTable{"accounts", "id", []string{"id", "parent_id", "name", "type", "currency", "closed_on"}},
+		historyTable{"transactions", "id", []string{"id", "date", "charge_date", "payee", "note", "kind"}},
+		historyTable{"postings", "transaction_id", []string{"id", "transaction_id", "account_id", "currency", "amount", "cost_currency", "cost_amount"}},
+		historyTable{"transaction_meta", "transaction_id", []string{"transaction_id", "key", "value"}},
+		historyTable{"tags", "id", []string{"id", "name"}},
+		historyTable{"transaction_tags", "transaction_id", []string{"transaction_id", "tag_id"}},
+		historyTable{"rate_sources", "name", []string{"name", "toml"}},
+		historyTable{"import_profiles", "name", []string{"name", "toml"}},
+		historyTable{"profile_accounts", "profile", []string{"profile", "account_id"}},
+		historyTable{"import_batches", "id", []string{"id", "account_id", "profile", "file_name"}},
+		historyTable{"rules", "id", []string{"id", "position", "pattern", "account_id", "min_amount", "max_amount", "tags"}},
+	) + changeCounter("settings", "accounts", "transactions", "postings", "transaction_meta", "tags", "transaction_tags",
 		"prices", "rate_sources", "import_profiles", "profile_accounts", "import_batches", "import_rows", "transfer_rows", "rules"),
 }
 
@@ -175,6 +214,42 @@ func changeCounter(tables ...string) string {
 				"UPDATE meta SET value = CAST(value AS INTEGER) + 1 WHERE key = 'change_seq'; END;\n",
 				t, strings.ToLower(op), op, t)
 		}
+	}
+	return b.String()
+}
+
+// historyTable is a table whose changes are kept in the history table.
+type historyTable struct {
+	name string
+	key  string   // column that names the row in history; rows of a transaction use its transaction_id
+	cols []string // recorded columns; bookkeeping columns such as updated_at are left out
+}
+
+// historyTriggers adds triggers that copy every insert, update and delete of the
+// given tables into history, as JSON, linked to the open action. An update that
+// changes no recorded column is not kept.
+func historyTriggers(tables ...historyTable) string {
+	var b strings.Builder
+	for _, t := range tables {
+		obj := func(row string) string {
+			var parts []string
+			for _, c := range t.cols {
+				parts = append(parts, fmt.Sprintf("'%s', %s.%s", c, row, c))
+			}
+			return "json_object(" + strings.Join(parts, ", ") + ")"
+		}
+		var changed []string
+		for _, c := range t.cols {
+			changed = append(changed, fmt.Sprintf("OLD.%s IS NOT NEW.%s", c, c))
+		}
+		insert := func(op, keyRow, old, new string) string {
+			return fmt.Sprintf("INSERT INTO history (action_id, tbl, row_key, op, old, new) VALUES "+
+				"((SELECT id FROM actions WHERE open = 1), '%s', %s.%s, '%s', %s, %s); END;\n", t.name, keyRow, t.key, op, old, new)
+		}
+		fmt.Fprintf(&b, "CREATE TRIGGER %s_insert_history AFTER INSERT ON %s BEGIN %s", t.name, t.name, insert("insert", "NEW", "NULL", obj("NEW")))
+		fmt.Fprintf(&b, "CREATE TRIGGER %s_update_history AFTER UPDATE ON %s WHEN %s BEGIN %s", t.name, t.name,
+			strings.Join(changed, " OR "), insert("update", "NEW", obj("OLD"), obj("NEW")))
+		fmt.Fprintf(&b, "CREATE TRIGGER %s_delete_history AFTER DELETE ON %s BEGIN %s", t.name, t.name, insert("delete", "OLD", obj("OLD"), "NULL"))
 	}
 	return b.String()
 }
@@ -228,10 +303,20 @@ func (s *Store) migrate(before func(s *Store, from, to int) error) error {
 			if seq, hasSeq, err = tx.Meta(ctx, "change_seq"); err != nil {
 				return err
 			}
+			// Data that a migration changes is kept in history under its own action.
+			if _, err := tx.q.ExecContext(ctx, "INSERT INTO actions (time, command) VALUES (strftime('%Y-%m-%dT%H:%M:%SZ','now'), ?)",
+				fmt.Sprintf("upgrade the book from schema %d to %d", cur, SchemaVersion)); err != nil {
+				return err
+			}
 		}
 		for v := cur; v < SchemaVersion; v++ {
 			if _, err := tx.q.ExecContext(ctx, migrations[v]); err != nil {
 				return fmt.Errorf("migrate schema to version %d: %w", v+1, err)
+			}
+		}
+		if cur > 0 {
+			if err := closeOpenAction(ctx, tx); err != nil {
+				return err
 			}
 		}
 		// An upgrade is not a change by the user: counting it would make sync see

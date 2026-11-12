@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strconv"
+	"strings"
 	"testing"
 )
 
@@ -17,6 +18,7 @@ import (
 // book has data when it is upgraded. A migration that adds a table adds its rows here.
 var seeds = map[int]string{
 	1: `
+INSERT INTO actions (id, time, machine, command) VALUES (1, '2026-01-05T10:00:00Z', 'laptop-1a2b', 'init');
 INSERT INTO meta (key, value) VALUES ('db_id', 'test-book');
 INSERT INTO settings (key, value) VALUES ('base_currency', 'EUR');
 INSERT INTO accounts (id, parent_id, name, type, currency) VALUES
@@ -37,6 +39,7 @@ INSERT INTO import_rows (id, batch_id, account_id, fingerprint, line, raw, trans
 	(1, 1, 2, 'abc', 2, '2026-01-05,Cafe,-8.50', 1), (2, 1, 2, 'def', 3, '2026-01-06,Card payment,-100.00', NULL);
 INSERT INTO transfer_rows (import_row_id, target_id, date, amount, payee) VALUES (2, 6, '2026-01-06', -10000, 'Card payment');
 INSERT INTO rules (position, pattern, account_id) VALUES (1, 'cafe', 4);
+UPDATE actions SET open = 0;
 `,
 }
 
@@ -103,6 +106,77 @@ func inspect(t *testing.T, path string) dbInfo {
 	return info
 }
 
+// noChangeCounter lists the tables whose writes do not count as changes for sync:
+// sync bookkeeping, and history, which changes only together with other tables
+// (PruneHistory counts itself).
+var noChangeCounter = map[string]bool{"meta": true, "actions": true, "history": true, "sqlite_sequence": true}
+
+// notInHistory lists the tables whose changes are not kept in history: bookkeeping,
+// and data that is downloaded or read from import files again.
+var notInHistory = map[string]bool{"meta": true, "actions": true, "history": true, "sqlite_sequence": true,
+	"prices": true, "import_rows": true, "transfer_rows": true}
+
+// notRecorded lists columns that history leaves out: they change with every edit.
+var notRecorded = map[string]bool{"transactions.version": true, "transactions.created_at": true, "transactions.updated_at": true,
+	"rate_sources.updated_at": true, "import_profiles.updated_at": true, "import_batches.created_at": true}
+
+func TestHistorySchema(t *testing.T) {
+	db, err := sql.Open("sqlite3", "file:"+(&url.URL{Path: bookAtVersion(t, SchemaVersion)}).EscapedPath())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	query := func(q string, args ...any) []string {
+		t.Helper()
+		rows, err := db.Query(q, args...)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer rows.Close()
+		var out []string
+		for rows.Next() {
+			var v string
+			if err := rows.Scan(&v); err != nil {
+				t.Fatal(err)
+			}
+			out = append(out, v)
+		}
+		return out
+	}
+	// Every table either counts changes for sync and keeps history, or is listed
+	// above as an exception, so a new table needs a decision.
+	t.Run("every table has triggers", func(t *testing.T) {
+		for _, tbl := range query("SELECT name FROM sqlite_master WHERE type = 'table'") {
+			for _, op := range []string{"insert", "update", "delete"} {
+				if !noChangeCounter[tbl] && len(query("SELECT name FROM sqlite_master WHERE name = ?", tbl+"_"+op+"_seq")) == 0 {
+					t.Errorf("table %s has no %s trigger for sync", tbl, op)
+				}
+				if !notInHistory[tbl] && len(query("SELECT name FROM sqlite_master WHERE name = ?", tbl+"_"+op+"_history")) == 0 {
+					t.Errorf("table %s has no %s trigger for history: add it to historyTriggers, or to notInHistory here", tbl, op)
+				}
+			}
+		}
+	})
+	// A column missing from the history triggers would be lost silently when it changes.
+	t.Run("every column is recorded", func(t *testing.T) {
+		for _, tbl := range query("SELECT name FROM sqlite_master WHERE type = 'table'") {
+			if notInHistory[tbl] {
+				continue
+			}
+			trig := query("SELECT sql FROM sqlite_master WHERE name = ?", tbl+"_update_history")
+			if len(trig) == 0 {
+				t.Errorf("table %s has no history triggers: add it to historyTriggers, or to notInHistory here", tbl)
+				continue
+			}
+			for _, col := range query("SELECT name FROM pragma_table_info(?)", tbl) {
+				if !notRecorded[tbl+"."+col] && !strings.Contains(trig[0], "NEW."+col+")") && !strings.Contains(trig[0], "NEW."+col+",") {
+					t.Errorf("column %s.%s is not in its history triggers", tbl, col)
+				}
+			}
+		}
+	})
+}
+
 func TestUpgrade(t *testing.T) {
 	ctx := context.Background()
 
@@ -136,14 +210,18 @@ func TestUpgrade(t *testing.T) {
 				t.Error("no copy was made before the upgrade")
 			}
 			for tbl, n := range before.counts {
-				if tbl != "meta" && after.counts[tbl] != n {
+				// History may grow: data a migration changes is kept there.
+				if grows := tbl == "actions" || tbl == "history"; grows && after.counts[tbl] < n || !grows && tbl != "meta" && after.counts[tbl] != n {
 					t.Errorf("table %s: %d rows before the upgrade, %d after", tbl, n, after.counts[tbl])
 				}
 			}
 			for tbl := range after.counts {
 				for _, op := range []string{"insert", "update", "delete"} {
-					if tbl != "meta" && !slices.Contains(after.objects, fmt.Sprintf("trigger %s_%s_seq", tbl, op)) {
+					if !noChangeCounter[tbl] && !slices.Contains(after.objects, fmt.Sprintf("trigger %s_%s_seq", tbl, op)) {
 						t.Errorf("table %s has no %s trigger for sync", tbl, op)
+					}
+					if !notInHistory[tbl] && !slices.Contains(after.objects, fmt.Sprintf("trigger %s_%s_history", tbl, op)) {
+						t.Errorf("table %s has no %s trigger for history", tbl, op)
 					}
 				}
 			}

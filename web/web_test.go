@@ -253,6 +253,11 @@ func TestReviewTransfer(t *testing.T) {
 	if waiting, _ := a.WaitingTransfers(context.Background()); len(waiting) != 0 {
 		t.Fatal("transfer still waiting")
 	}
+	// A change made in the browser is in history, named by the page that made it.
+	h, err := a.History(context.Background(), app.HistoryParams{Limit: 1})
+	if err != nil || len(h) != 1 || h[0].Command != "browser: POST /review/transfer/1" {
+		t.Fatalf("history %+v, %v", h, err)
+	}
 }
 
 func itoa(n int64) string { return strconv.FormatInt(n, 10) }

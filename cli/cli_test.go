@@ -26,6 +26,9 @@ type session struct {
 	t       *testing.T
 }
 
+// History shows local times; tests show them in UTC on every computer.
+func init() { time.Local = time.UTC }
+
 func newSession(t *testing.T) *session {
 	dir := t.TempDir()
 	return &session{env: app.Paths{ConfigDir: filepath.Join(dir, "config"), DataDir: filepath.Join(dir, "data"), StateDir: filepath.Join(dir, "state")}, t: t}
@@ -146,6 +149,29 @@ func TestScenarios(t *testing.T) {
 		s.run("--format csv report income --month 2026-10")
 		s.run("--format csv category list")
 		s.golden("everyday")
+	})
+
+	// Every change is kept under the command that made it, with what it changed;
+	// pruning removes history, not data.
+	t.Run("history", func(t *testing.T) {
+		s := newSession(t)
+		writeMachineID(t, s, "laptop-1a2b")
+		s.run("init --base ILS --no-backup-key")
+		s.run("account add assets:bank:leumi --currency ILS --opening 1000 --date 2026-10-01")
+		s.run("add leumi -50 food --date 2026-10-02 --payee Cafe --tag trip")
+		s.run("category rename food eat")
+		s.run("rule add cafe eat")
+		s.run("config set locale de_DE")
+		s.run("delete 2 --yes")
+		s.run("history")
+		s.run("history 4")
+		s.run("history 7")
+		s.run("history --tx 2")
+		s.run("--format csv history --limit 2")
+		s.run("history prune --before 2026-11-05 --yes")
+		s.run("history")
+		s.run("account list")
+		s.golden("history")
 	})
 
 	// Changing the taxonomy only happens through commands, and history follows renames and merges.

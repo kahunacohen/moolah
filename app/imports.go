@@ -109,12 +109,17 @@ func (a *App) SaveProfile(ctx context.Context, text string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return p.Name, a.st.UpsertProfile(ctx, p.Name, text)
+	return p.Name, a.st.InTx(ctx, func(tx *store.Tx) error { return tx.UpsertProfile(ctx, p.Name, text) })
 }
 
 // RemoveProfile removes a user profile.
 func (a *App) RemoveProfile(ctx context.Context, name string) error {
-	ok, err := a.st.DeleteProfile(ctx, name)
+	var ok bool
+	err := a.st.InTx(ctx, func(tx *store.Tx) error {
+		var err error
+		ok, err = tx.DeleteProfile(ctx, name)
+		return err
+	})
 	if err == nil && !ok {
 		err = fmt.Errorf("there is no user profile %q (built-in profiles cannot be removed)", name)
 	}
@@ -771,12 +776,18 @@ func (a *App) AddRule(ctx context.Context, p RuleParams) (int64, int, error) {
 			return 0, 0, err
 		}
 	}
-	id, err := a.st.InsertRule(ctx, store.RuleRow{AccountID: target.ID, MaxAmount: p.MaxAmount, MinAmount: p.MinAmount,
-		Pattern: p.Pattern, Tags: normalizeTags(p.Tags)})
-	if err != nil {
-		return 0, 0, err
-	}
-	n, err := a.ApplyRules(ctx)
+	var id int64
+	var n int
+	err = a.st.InTx(ctx, func(tx *store.Tx) error {
+		var err error
+		id, err = tx.InsertRule(ctx, store.RuleRow{AccountID: target.ID, MaxAmount: p.MaxAmount, MinAmount: p.MinAmount,
+			Pattern: p.Pattern, Tags: normalizeTags(p.Tags)})
+		if err != nil {
+			return err
+		}
+		n, err = a.applyRules(ctx, tx)
+		return err
+	})
 	return id, n, err
 }
 
@@ -800,7 +811,12 @@ func (a *App) Rules(ctx context.Context) ([]RuleView, error) {
 
 // RemoveRule deletes a rule. Transactions it already categorized do not change.
 func (a *App) RemoveRule(ctx context.Context, id int64) error {
-	ok, err := a.st.DeleteRule(ctx, id)
+	var ok bool
+	err := a.st.InTx(ctx, func(tx *store.Tx) error {
+		var err error
+		ok, err = tx.DeleteRule(ctx, id)
+		return err
+	})
 	if err == nil && !ok {
 		err = fmt.Errorf("there is no rule %d. See: moolah rule list", id)
 	}
@@ -812,6 +828,16 @@ func (a *App) RemoveRule(ctx context.Context, id int64) error {
 func (a *App) ApplyRules(ctx context.Context) (int, error) {
 	n := 0
 	err := a.st.InTx(ctx, func(tx *store.Tx) error {
+		var err error
+		n, err = a.applyRules(ctx, tx)
+		return err
+	})
+	return n, err
+}
+
+func (a *App) applyRules(ctx context.Context, tx *store.Tx) (int, error) {
+	n := 0
+	err := func() error {
 		tree, err := tx.Tree(ctx)
 		if err != nil {
 			return err
@@ -852,7 +878,7 @@ func (a *App) ApplyRules(ctx context.Context) (int, error) {
 			n++
 		}
 		return nil
-	})
+	}()
 	return n, err
 }
 

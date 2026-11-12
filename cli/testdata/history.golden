@@ -1,0 +1,97 @@
+$ moolah init --base ILS --no-backup-key
+Book "main" is ready in $TMP/data/books/main.db (base currency ILS).
+Next: add your accounts, for example:
+  moolah account add assets:bank:mybank --currency ILS --opening 1000
+  moolah category list
+
+$ moolah account add assets:bank:leumi --currency ILS --opening 1000 --date 2026-10-01
+Added assets:bank:leumi (ILS).
+
+$ moolah add leumi -50 food --date 2026-10-02 --payee Cafe --tag trip
+Added transaction 2 on 2026-10-02 (Cafe):
+  assets:bank:leumi              -50.00 ILS
+  expenses:food                  50.00 ILS
+
+$ moolah category rename food eat
+Renamed food to eat.
+
+$ moolah rule add cafe eat
+Added rule 1.
+
+$ moolah config set locale de_DE
+Set locale.
+
+$ moolah delete 2 --yes
+Deleted transaction 2.
+
+$ moolah history
+ID  Time              Computer     Command                                                                        Changes
+ 7  2026-11-04 12:00  laptop-1a2b  delete 2 --yes                                                                 1 transaction deleted
+ 6  2026-11-04 12:00  laptop-1a2b  config set locale de_DE                                                        1 setting changed
+ 5  2026-11-04 12:00  laptop-1a2b  rule add cafe eat                                                              1 rule added
+ 4  2026-11-04 12:00  laptop-1a2b  category rename food eat                                                       1 category changed
+ 3  2026-11-04 12:00  laptop-1a2b  add leumi -50 food --date 2026-10-02 --payee Cafe --tag trip                   1 transaction added, 1 tag added
+ 2  2026-11-04 12:00  laptop-1a2b  account add assets:bank:leumi --currency ILS --opening 1000 --date 2026-10-01  1 account added, 1 transaction added
+ 1  2026-11-04 12:00  laptop-1a2b  init --base ILS --no-backup-key                                                2 settings added, 9 accounts added, 29 categories added
+
+$ moolah history 4
+Action 4  2026-11-04 12:00  on laptop-1a2b
+  category rename food eat
+
+  category expenses:eat changed
+    name: food → eat
+
+$ moolah history 7
+Action 7  2026-11-04 12:00  on laptop-1a2b
+  delete 2 --yes
+
+  transaction 2 deleted
+    date: 2026-10-02
+    payee: Cafe
+    - tag trip
+    - assets:bank:leumi  -50,00 ILS
+    - expenses:eat  50,00 ILS
+
+$ moolah history --tx 2
+Action 7  2026-11-04 12:00  on laptop-1a2b
+  delete 2 --yes
+
+  transaction 2 deleted
+    date: 2026-10-02
+    payee: Cafe
+    - tag trip
+    - assets:bank:leumi  -50,00 ILS
+    - expenses:eat  50,00 ILS
+
+Action 3  2026-11-04 12:00  on laptop-1a2b
+  add leumi -50 food --date 2026-10-02 --payee Cafe --tag trip
+
+  transaction 2 added
+    date: 2026-10-02
+    payee: Cafe
+    + assets:bank:leumi  -50,00 ILS
+    + expenses:eat  50,00 ILS
+    + tag trip
+
+$ moolah --format csv history --limit 2
+ID,Time,Computer,Command,Changes
+7,2026-11-04 12:00,laptop-1a2b,delete 2 --yes,1 transaction deleted
+6,2026-11-04 12:00,laptop-1a2b,config set locale de_DE,1 setting changed
+
+$ moolah history prune --before 2026-11-05 --yes
+Deleted the history of 7 actions before 2026-11-05.
+
+$ moolah history
+No history yet.
+
+$ moolah account list
+Name         Currency  Closed
+assets
+  bank
+    leumi    ILS
+  cash
+  invest
+liabilities
+  card
+  loan
+

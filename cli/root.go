@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"regexp"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -33,6 +34,7 @@ type Env struct {
 
 type globals struct {
 	book    string
+	ctx     context.Context // names the command line for history
 	db      string
 	env     Env
 	format  string
@@ -47,7 +49,7 @@ var negativeNumber = regexp.MustCompile(`^-[0-9][0-9,]*(\.[0-9]+)?$`)
 
 // Run executes moolah with the given arguments and returns the exit code.
 func Run(env Env, args []string) int {
-	g := &globals{env: env, in: newPrompter(env)}
+	g := &globals{ctx: app.WithCommand(context.Background(), commandLine(args)), env: env, in: newPrompter(env)}
 	root := newRoot(g)
 	fixed := make([]string, len(args))
 	for i, a := range args {
@@ -60,11 +62,23 @@ func Run(env Env, args []string) int {
 	root.SetIn(env.Stdin)
 	root.SetOut(env.Stdout)
 	root.SetErr(env.Stderr)
-	if err := root.Execute(); err != nil {
+	if err := root.ExecuteContext(g.ctx); err != nil {
 		fmt.Fprintln(env.Stderr, "error: "+err.Error())
 		return 1
 	}
 	return 0
+}
+
+// commandLine shows the arguments as a shell command line, for history.
+func commandLine(args []string) string {
+	parts := make([]string, len(args))
+	for i, a := range args {
+		if a == "" || strings.ContainsAny(a, " \t\n'\"\\$|&;<>*?") {
+			a = "'" + strings.ReplaceAll(a, "'", `'\''`) + "'"
+		}
+		parts[i] = a
+	}
+	return strings.Join(parts, " ")
 }
 
 func newRoot(g *globals) *cobra.Command {
@@ -118,7 +132,7 @@ func (g *globals) open() (*app.App, error) {
 	// programs, so they always write 1234.56.
 	if g.format != "table" {
 		core.SetNumberStyle(core.NumberStyle{Decimal: "."})
-	} else if loc, err := a.Config(context.Background(), app.KeyLocale); err == nil {
+	} else if loc, err := a.Config(g.ctx, app.KeyLocale); err == nil {
 		core.SetNumberStyle(app.NumberStyleFor(loc))
 	}
 	a.Passphrase = func() (string, error) { return g.in.passphrase(false) }
@@ -136,7 +150,7 @@ func (g *globals) withBookSync(sync bool, fn func(a *app.App) error) error {
 	if err != nil {
 		return err
 	}
-	ctx := context.Background()
+	ctx := g.ctx
 	if sync {
 		warnings, err := a.SyncBefore(ctx)
 		for _, w := range warnings {

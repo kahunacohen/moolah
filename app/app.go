@@ -28,6 +28,7 @@ type App struct {
 	Offline    bool                   // never use the network (also the offline setting)
 	Passphrase func() (string, error) // asked when a private key has a passphrase
 	Paths      Paths
+	machine    string // this computer's name in history, read on first use
 	now        func() time.Time
 	st         *store.Store
 }
@@ -45,7 +46,7 @@ func Open(path, book string, paths Paths) (*App, error) {
 	if err != nil {
 		return nil, err
 	}
-	a.st = st
+	a.attach(st)
 	return a, nil
 }
 
@@ -53,7 +54,9 @@ func Open(path, book string, paths Paths) (*App, error) {
 type InitParams struct {
 	BackupRecipient string
 	BaseCurrency    core.Currency
+	Command         string // the user action, for history (default "init")
 	Locale          string
+	Now             func() time.Time // default time.Now
 	Path            string
 }
 
@@ -82,8 +85,15 @@ func Create(p InitParams, book string, paths Paths) (*App, error) {
 	if err != nil {
 		return nil, err
 	}
-	a := &App{Book: book, Paths: paths, now: time.Now, st: st}
-	ctx := context.Background()
+	a := &App{Book: book, Paths: paths, now: time.Now}
+	if p.Now != nil {
+		a.now = p.Now
+	}
+	if p.Command == "" {
+		p.Command = "init"
+	}
+	a.attach(st)
+	ctx := WithCommand(context.Background(), p.Command)
 	err = st.InTx(ctx, func(tx *store.Tx) error {
 		id := make([]byte, 16)
 		if _, err := rand.Read(id); err != nil {

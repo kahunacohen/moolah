@@ -41,8 +41,9 @@ type Q struct {
 // Store is an open moolah database file.
 type Store struct {
 	Q
-	db   *sql.DB
-	path string
+	action func(context.Context) Action // describes the action of each write transaction; nil records none
+	db     *sql.DB
+	path   string
 }
 
 // Tx is a database transaction. All methods of Q work inside it.
@@ -112,12 +113,21 @@ func (s *Store) Path() string { return s.path }
 func (s *Store) Close() error { return s.db.Close() }
 
 // InTx runs fn in one database transaction. It commits when fn returns nil.
+// With SetAction, the changes fn makes are kept in history under one action.
 func (s *Store) InTx(ctx context.Context, fn func(tx *Tx) error) error {
 	sqlTx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
-	if err := fn(&Tx{Q: Q{q: sqlTx}}); err != nil {
+	tx := &Tx{Q: Q{q: sqlTx}}
+	err = s.openAction(ctx, tx)
+	if err == nil {
+		err = fn(tx)
+	}
+	if err == nil {
+		err = s.closeAction(ctx, tx)
+	}
+	if err != nil {
 		_ = sqlTx.Rollback()
 		return err
 	}

@@ -16,6 +16,7 @@ import (
 
 	"moolah/core"
 	"moolah/crypt"
+	"moolah/store"
 )
 
 // Setting keys.
@@ -254,10 +255,12 @@ func (a *App) SetConfig(ctx context.Context, key, value string) error {
 			return nil
 		})
 	}
-	if value == "" {
-		return a.st.DeleteSetting(ctx, key)
-	}
-	return a.st.SetSetting(ctx, key, value)
+	return a.st.InTx(ctx, func(tx *store.Tx) error {
+		if value == "" {
+			return tx.DeleteSetting(ctx, key)
+		}
+		return tx.SetSetting(ctx, key, value)
+	})
 }
 
 func knownKey(key string) error {

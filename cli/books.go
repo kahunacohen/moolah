@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -111,7 +110,8 @@ func (g *globals) createBook(f initFlags, loc app.Location) (*app.App, error) {
 		}
 	}
 	a, err := app.Create(app.InitParams{
-		BackupRecipient: f.backupRecipient, BaseCurrency: base, Locale: f.locale, Path: loc.Path,
+		BackupRecipient: f.backupRecipient, BaseCurrency: base, Command: app.CommandOf(g.ctx), Locale: f.locale,
+		Now: g.env.Now, Path: loc.Path,
 	}, loc.Book, g.env.Paths)
 	if err != nil {
 		return nil, err
@@ -119,7 +119,7 @@ func (g *globals) createBook(f initFlags, loc app.Location) (*app.App, error) {
 	a.SetClock(g.env.Now)
 	a.Passphrase = func() (string, error) { return g.in.passphrase(false) }
 	if f.syncDir != "" {
-		if err := a.SyncInit(context.Background(), f.syncDir, f.identity); err != nil {
+		if err := a.SyncInit(g.ctx, f.syncDir, f.identity); err != nil {
 			_ = a.Close()
 			return nil, fmt.Errorf("the book was created, but sync did not start: %w", err)
 		}

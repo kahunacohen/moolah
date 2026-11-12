@@ -390,12 +390,17 @@ func (a *App) SaveRateSource(ctx context.Context, text string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return s.SourceName, a.st.UpsertRateSource(ctx, s.SourceName, text)
+	return s.SourceName, a.st.InTx(ctx, func(tx *store.Tx) error { return tx.UpsertRateSource(ctx, s.SourceName, text) })
 }
 
 // RemoveRateSource removes a user rate source. Rates it downloaded stay.
 func (a *App) RemoveRateSource(ctx context.Context, name string) error {
-	ok, err := a.st.DeleteRateSource(ctx, name)
+	var ok bool
+	err := a.st.InTx(ctx, func(tx *store.Tx) error {
+		var err error
+		ok, err = tx.DeleteRateSource(ctx, name)
+		return err
+	})
 	if err == nil && !ok {
 		err = fmt.Errorf("there is no user rate source %q (built-in sources cannot be removed; leave them out of rate_sources instead)", name)
 	}

@@ -220,7 +220,7 @@ func (s *Server) locked(h func(w http.ResponseWriter, r *http.Request)) http.Han
 	return func(w http.ResponseWriter, r *http.Request) {
 		s.mu.Lock()
 		defer s.mu.Unlock()
-		h(w, r)
+		h(w, r.WithContext(app.WithCommand(r.Context(), "browser: "+r.Method+" "+r.URL.Path)))
 	}
 }
 

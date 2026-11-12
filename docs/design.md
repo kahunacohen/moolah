@@ -185,6 +185,14 @@ The user moves between computers often, but works on one at a time.
 - **Text typed in a browser form but not submitted** is lost if the tab is closed. This is accepted (forms are short).
 - **`serve` and sync**: push a few seconds after the last change (debounce) and on shutdown (Ctrl+C / SIGTERM). Pull every `sync_interval` when there are no local changes; the DB is replaced between requests, under a lock. When a pull is blocked by local changes that were not pushed, push first. `core` and `app` do not know about sync, except for one hook that runs pull/push around commands.
 
+## 8e. History
+- Every change to user data is kept in the book, like a `git log`: `actions` (one row per user action: time, computer, command line or browser request) and `history` (one row per changed row: table, key, op, old and new row as JSON).
+- **SQLite triggers write history**, so no code path can skip it. Each `store.InTx` opens an action (the one `actions` row with `open = 1`); the triggers link their rows to it; at commit an action that changed nothing is dropped. A change made outside moolah (sqlite3) gets `action_id NULL`.
+- Kept: transactions and their lines, meta and tags, accounts, tags, settings, rules, profiles, rate sources, import batches. Not kept: downloaded prices, raw import rows, waiting transfer rows (downloaded or read from files again). Bookkeeping columns (`version`, `updated_at`) are left out, so an update that changes only them is not kept.
+- IDs of transactions, accounts, tags, rules and import batches use AUTOINCREMENT, so an ID in history always means one thing.
+- History is inside the book, so it syncs and is backed up. `history prune --before DATE` deletes old history (privacy); it counts as a change for sync.
+- No general undo: `restore` of one action may come later; it must stop when later actions changed the same rows.
+
 ## 9. Languages and RTL
 - UTF-8 everywhere. Web: `dir="rtl"` from the locale, CSS logical properties, numbers in `<bdi>`. CLI: LTR tables, plus `--format json|csv`.
 
