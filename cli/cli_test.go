@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -172,6 +173,48 @@ func TestScenarios(t *testing.T) {
 		s.run("history")
 		s.run("account list")
 		s.golden("history")
+	})
+
+	// The export holds every transaction, account, rate and rule as text, and
+	// never overwrites files.
+	t.Run("export", func(t *testing.T) {
+		s := newSession(t)
+		s.run("init --base ILS --no-backup-key")
+		s.run("account add assets:bank:leumi --currency ILS --opening 25000 --date 2026-10-01")
+		s.run("account add liabilities:card:chase --currency USD")
+		s.run("account add assets:invest:pension --currency ILS --opening 380000 --date 2026-10-01")
+		s.run("add leumi -200 food --date 2026-10-03 --payee Shufersal --note weekly --tag trip")
+		s.run("transfer leumi card:chase 1530 --to-amount 420 --fee 15 --date 2026-11-01")
+		s.run("add card:chase -42.17 shopping --date 2026-11-02 --payee Amazon")
+		s.run("value pension 390000 --date 2026-10-31")
+		s.run("rates add 2026-10-31 USD ILS 3.65")
+		s.run("rule add amazon shopping")
+		dir := filepath.Join(filepath.Dir(s.env.DataDir), "export")
+		s.run("export " + dir)
+		s.run("export " + dir)
+		for _, f := range []string{"moolah.journal", "transactions.csv", "prices.csv", "rules.csv", "settings.toml"} {
+			b, err := os.ReadFile(filepath.Join(dir, f))
+			if err != nil {
+				t.Fatal(err)
+			}
+			fmt.Fprintf(&s.log, "\n==> %s <==\n%s", f, b)
+		}
+		s.golden("export")
+		// hledger reads the journal and gets moolah's balances (when hledger is installed).
+		hledger, err := exec.LookPath("hledger")
+		if err != nil {
+			t.Log("hledger is not installed; the journal was not checked with it")
+			return
+		}
+		out, err := exec.Command(hledger, "-f", filepath.Join(dir, "moolah.journal"), "balance", "--flat", "-N", "assets", "liabilities").CombinedOutput()
+		if err != nil {
+			t.Fatalf("hledger: %v\n%s", err, out)
+		}
+		for _, want := range []string{"23255.00 ILS  assets:bank:leumi", "390000.00 ILS  assets:invest:pension", "377.83 USD  liabilities:card:chase"} {
+			if !strings.Contains(strings.Join(strings.Fields(string(out)), " "), strings.Join(strings.Fields(want), " ")) {
+				t.Errorf("hledger balance lacks %q:\n%s", want, out)
+			}
+		}
 	})
 
 	// Changing the taxonomy only happens through commands, and history follows renames and merges.

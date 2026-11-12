@@ -193,6 +193,10 @@ The user moves between computers often, but works on one at a time.
 - History is inside the book, so it syncs and is backed up. `history prune --before DATE` deletes old history (privacy); it counts as a change for sync.
 - No general undo: `restore` of one action may come later; it must stop when later actions changed the same rows.
 
+## 8f. Export
+- `moolah export <folder>` writes the book as text: an hledger/Ledger journal (the same double-entry model, with `@@` for cost), `transactions.csv` (one row per posting), `prices.csv`, `rules.csv`, `settings.toml`, and user profiles and rate sources as TOML. It is a way out of moolah, not a backup format: there is no import of it, and history is not exported.
+- The journal leaves out rates implied by transactions (`tx`): hledger infers them from `@@`, and a second rate on the same day could make hledger choose differently from moolah's source priority.
+
 ## 9. Languages and RTL
 - UTF-8 everywhere. Web: `dir="rtl"` from the locale, CSS logical properties, numbers in `<bdi>`. CLI: LTR tables, plus `--format json|csv`.
 

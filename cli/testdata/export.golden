@@ -1,0 +1,163 @@
+$ moolah init --base ILS --no-backup-key
+Book "main" is ready in $TMP/data/books/main.db (base currency ILS).
+Next: add your accounts, for example:
+  moolah account add assets:bank:mybank --currency ILS --opening 1000
+  moolah category list
+
+$ moolah account add assets:bank:leumi --currency ILS --opening 25000 --date 2026-10-01
+Added assets:bank:leumi (ILS).
+
+$ moolah account add liabilities:card:chase --currency USD
+Added liabilities:card:chase (USD).
+
+$ moolah account add assets:invest:pension --currency ILS --opening 380000 --date 2026-10-01
+Added assets:invest:pension (ILS).
+
+$ moolah add leumi -200 food --date 2026-10-03 --payee Shufersal --note weekly --tag trip
+Added transaction 3 on 2026-10-03 (Shufersal):
+  assets:bank:leumi              -200.00 ILS
+  expenses:food                  200.00 ILS
+
+$ moolah transfer leumi card:chase 1530 --to-amount 420 --fee 15 --date 2026-11-01
+Added transaction 4 on 2026-11-01 (Transfer):
+  assets:bank:leumi              -1,545.00 ILS
+  liabilities:card:chase         420.00 USD (for 1,530.00 ILS)
+  expenses:fees                  15.00 ILS
+
+$ moolah add card:chase -42.17 shopping --date 2026-11-02 --payee Amazon
+Added transaction 5 on 2026-11-02 (Amazon):
+  liabilities:card:chase         -42.17 USD
+  expenses:shopping              42.17 USD
+
+$ moolah value pension 390000 --date 2026-10-31
+Booked a gain of 10,000.00 ILS (balance was 380,000.00 ILS). Transaction 6.
+
+$ moolah rates add 2026-10-31 USD ILS 3.65
+Saved 1 USD = 3.65 ILS on 2026-10-31.
+
+$ moolah rule add amazon shopping
+Added rule 1.
+
+$ moolah export $TMP/export
+Exported 6 transactions to $TMP/export:
+  moolah.journal
+  transactions.csv
+  prices.csv
+  rules.csv
+  settings.toml
+The files are not encrypted. Keep them somewhere safe, or delete them when done.
+
+$ moolah export $TMP/export
+error: $TMP/export is not empty. Export into a new folder, so no file is overwritten
+[exit 1]
+
+
+==> moolah.journal <==
+; moolah export of book "main". Base currency: ILS.
+; Read it with hledger (hledger -f moolah.journal balance) or Ledger.
+
+account assets
+account assets:bank
+account assets:bank:leumi
+    ; currency: ILS
+account assets:cash
+account assets:invest
+account assets:invest:pension
+    ; currency: ILS
+account liabilities
+account liabilities:card
+account liabilities:card:chase
+    ; currency: USD
+account liabilities:loan
+account income
+account income:gifts
+account income:interest
+account income:invest
+account income:invest:gains
+account income:other
+account income:salary
+account income:salary:pension
+account expenses
+account expenses:education
+account expenses:fees
+account expenses:food
+account expenses:food:groceries
+account expenses:food:restaurants
+account expenses:gifts
+account expenses:health
+account expenses:household
+account expenses:housing
+account expenses:housing:rent
+account expenses:shopping
+account expenses:subscriptions
+account expenses:taxes
+account expenses:transport
+account expenses:transport:fuel
+account expenses:transport:public
+account expenses:travel
+account expenses:travel:flights
+account expenses:uncategorized
+account expenses:utilities
+account equity
+account equity:opening
+
+P 2026-10-31 USD 3.65 ILS
+
+2026-10-01 (1) Opening balance
+    ; kind: opening
+    assets:bank:leumi  25000.00 ILS
+    equity:opening     -25000.00 ILS
+
+2026-10-01 (2) Opening balance
+    ; kind: opening
+    assets:invest:pension  380000.00 ILS
+    equity:opening         -380000.00 ILS
+
+2026-10-03 (3) Shufersal | weekly
+    ; trip:
+    assets:bank:leumi  -200.00 ILS
+    expenses:food      200.00 ILS
+
+2026-10-31 (6) Valuation
+    ; kind: valuation
+    assets:invest:pension  10000.00 ILS
+    income:invest:gains    -10000.00 ILS
+
+2026-11-01 (4) Transfer
+    assets:bank:leumi       -1545.00 ILS
+    liabilities:card:chase  420.00 USD @@ 1530.00 ILS
+    expenses:fees           15.00 ILS
+
+2026-11-02 (5) Amazon
+    liabilities:card:chase  -42.17 USD
+    expenses:shopping       42.17 USD
+
+==> transactions.csv <==
+transaction_id,date,charge_date,payee,note,kind,tags,meta,account,amount,currency,cost_amount,cost_currency
+1,2026-10-01,,Opening balance,,opening,,,assets:bank:leumi,25000.00,ILS,,
+1,2026-10-01,,Opening balance,,opening,,,equity:opening,-25000.00,ILS,,
+2,2026-10-01,,Opening balance,,opening,,,assets:invest:pension,380000.00,ILS,,
+2,2026-10-01,,Opening balance,,opening,,,equity:opening,-380000.00,ILS,,
+3,2026-10-03,,Shufersal,weekly,normal,trip,,assets:bank:leumi,-200.00,ILS,,
+3,2026-10-03,,Shufersal,weekly,normal,trip,,expenses:food,200.00,ILS,,
+6,2026-10-31,,Valuation,,valuation,,,assets:invest:pension,10000.00,ILS,,
+6,2026-10-31,,Valuation,,valuation,,,income:invest:gains,-10000.00,ILS,,
+4,2026-11-01,,Transfer,,normal,,,assets:bank:leumi,-1545.00,ILS,,
+4,2026-11-01,,Transfer,,normal,,,liabilities:card:chase,420.00,USD,1530.00,ILS
+4,2026-11-01,,Transfer,,normal,,,expenses:fees,15.00,ILS,,
+5,2026-11-02,,Amazon,,normal,,,liabilities:card:chase,-42.17,USD,,
+5,2026-11-02,,Amazon,,normal,,,expenses:shopping,42.17,USD,,
+
+==> prices.csv <==
+date,from,to,rate,source
+2026-10-31,USD,ILS,3.65,manual
+2026-11-01,USD,ILS,3.6428571429,tx
+
+==> rules.csv <==
+position,pattern,account,min_amount,max_amount,tags
+1,amazon,expenses:shopping,,,
+
+==> settings.toml <==
+# Book settings. Set them in another book with: moolah config set <key> <value>
+base_currency = "ILS"
+locale = "en_US"
