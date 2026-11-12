@@ -476,6 +476,58 @@ $ moolah history --tx 2                     # every action that changed transact
 - **Deleted data stays in history.** To really remove old data, delete the history before a date: `moolah history prune --before 2026-01-01`. Your data does not change. With sync, your other computers drop the same history.
 - moolah shows history; it does not undo it. To go back, look at what changed and do the opposite, or restore a backup.
 
+## Exporting to text
+
+`moolah export` writes the whole book as text files into a new or empty folder, so your data stays readable without moolah. One command writes all the files:
+
+```sh
+moolah export ~/moolah-export
+hledger -f ~/moolah-export/moolah.journal balance      # the same balances, in hledger
+```
+
+| File | Contents |
+|---|---|
+| `moolah.journal` | accounts, transactions and exchange rates, in the plain-text accounting format that [hledger](https://hledger.org) and [Ledger](https://ledger-cli.org) read |
+| `transactions.csv` | the same transactions, one row per transaction line, for spreadsheets and scripts |
+| `prices.csv` | all exchange rates: `date,from,to,rate,source` |
+| `rules.csv` | your import rules, in matching order: `position,pattern,account,min_amount,max_amount,tags` |
+| `settings.toml` | the book's settings (base currency, language, …) |
+| `profiles/*.toml`, `rate-sources/*.toml` | your own import profiles and rate sources; built-in ones are not exported |
+
+**The journal.** hledger and Ledger are two well-known open-source accounting programs that read plain text files. They use the same double-entry model as moolah, so nothing is lost. A transaction in the journal:
+
+```
+2026-11-01 (4) Transfer
+    assets:bank:leumi       -1545.00 ILS
+    liabilities:card:chase  420.00 USD @@ 1530.00 ILS
+    expenses:fees           15.00 ILS
+```
+
+- `(4)` is the transaction ID in moolah. `@@` is the total cost of an amount in another currency.
+- A card charge date is a second date: `2026-10-03=2026-11-10`. A note follows the payee after ` | `.
+- Tags and details (for example the original foreign amount) are comment lines below the date: `; trip:`, `; orig: 38.00 EUR`.
+- `;` and `|` in a payee or note would break the line, so the journal writes them as `,` and `/`. The CSV keeps the text as it is.
+- Rates that moolah derived from your own transactions are only in `prices.csv`. hledger derives them itself from `@@`.
+- For Beancount, convert the journal with hledger: `hledger -f moolah.journal print -O beancount`.
+
+**The CSV.** `transactions.csv` has one row per transaction line, with the transaction's fields repeated on each of its lines. Numbers use a dot and no thousands separator, whatever your language setting.
+
+```
+transaction_id,date,charge_date,payee,note,kind,tags,meta,account,amount,currency,cost_amount,cost_currency
+4,2026-11-01,,Transfer,,normal,,,assets:bank:leumi,-1545.00,ILS,,
+4,2026-11-01,,Transfer,,normal,,,liabilities:card:chase,420.00,USD,1530.00,ILS
+4,2026-11-01,,Transfer,,normal,,,expenses:fees,15.00,ILS,,
+```
+
+`kind` is `normal`, `opening` (opening balance) or `valuation` (from `moolah value`). `tags` are separated by commas, `meta` entries by `; `. To total spending by category in a spreadsheet, filter `account` on `expenses:` and add up `amount` per currency.
+
+**Good to know:**
+- **The files are not encrypted.** Keep them somewhere safe, or delete them when you are done.
+- moolah writes only into a new or empty folder, so an export never overwrites files.
+- History is not exported; it stays in the book.
+- moolah cannot read an export back. To move a book to another computer, use `moolah backup` and `moolah restore`, or sync.
+
+## Working on different machines
 
 You can use moolah on several computers, for example a desktop at home and a laptop. moolah moves your data between them automatically, through a folder that you already sync with Dropbox, Syncthing, Google Drive, Nextcloud or a similar tool.
 
@@ -616,6 +668,8 @@ When you have more than one book, reports and the browser UI show the book name 
 | `account card:old is closed since 2026-10-31` | The transaction date is after the close date. |
 | `conflict: laptop and desktop both changed data` | See [Working on different machines](#working-on-different-machines). Choose a copy with `moolah sync resolve`. |
 | `changed elsewhere, reload` (browser) | The transaction was changed in another tab or by a CLI command after you opened it. Reload the page and edit again. |
+| `… is not empty. Export into a new folder` | `moolah export` writes only into a new or empty folder. Give another folder name. |
+| `… is a database, but not a moolah book` | `moolah restore` was given another program's SQLite file. Check the file name. |
 | `no import profile matches this file` | Your bank's format is not supported yet. See [Adding an import profile](#adding-an-import-profile). |
 
 ---
@@ -704,6 +758,7 @@ Your import profiles, rate sources, rules and categories are **book** data: they
 - **Do not put the live database in a cloud-sync folder** (Dropbox, Google Drive, and so on). Sync tools can damage an open SQLite file, and the file is not encrypted. Use moolah's own sync (`moolah sync init`), which puts only encrypted snapshots in the folder.
 - **The browser UI** listens only on `127.0.0.1`. It is protected against other websites and local programs by a random session token, a `Host` header check (against DNS rebinding) and an `Origin` check with CSRF tokens on every change.
 - moolah never asks for or stores bank passwords.
+- **Exports are not encrypted.** `moolah export` writes plain text files (readable only by your user). Delete them when you no longer need them.
 - **Deleting a transaction does not remove it from the file**: the [history](#history-of-changes) keeps it. Use `moolah history prune` to remove old history.
 - An encrypted database file may be added in a later version.
 
