@@ -193,7 +193,7 @@ func restoreCmd(g *globals) *cobra.Command {
 	var identity string
 	var yes bool
 	cmd := &cobra.Command{
-		Use: "restore <backup.db.age>", Short: "Replace the book with a backup", Args: cobra.ExactArgs(1),
+		Use: "restore <backup.db.age | book.db>", Short: "Replace the book with a backup or a copy of a book", Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			loc, err := g.location()
 			if err != nil {

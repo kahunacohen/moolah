@@ -3,6 +3,7 @@ package app
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"os"
 	"path/filepath"
@@ -289,6 +290,41 @@ func TestBackupRestore(t *testing.T) {
 		mustDo(t, func() error {
 			return Restore(RestoreParams{File: files[0], IdentityFile: keyFile, Target: filepath.Join(t.TempDir(), "r.db")})
 		})
+	})
+	// A plain book file restores too (for example the copy made before an upgrade
+	// of a book without a backup key), including changes still in its WAL file.
+	t.Run("plain book file", func(t *testing.T) {
+		a := newBook(t)
+		target := filepath.Join(t.TempDir(), "r.db")
+		mustDo(t, func() error { return Restore(RestoreParams{File: a.Path(), Target: target}) })
+		r, err := Open(target, "", a.Paths)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer r.Close()
+		rep, err := r.Balances(ctx, BalanceParams{})
+		if err != nil || !rep.NetWorth.Equal(dec("25000")) {
+			t.Fatalf("restored net worth %s, %v", rep.NetWorth, err)
+		}
+	})
+	// Another program's database is refused, and the book stays as it was.
+	t.Run("other database refused", func(t *testing.T) {
+		a := newBook(t)
+		other := filepath.Join(t.TempDir(), "other.db")
+		db, err := sql.Open("sqlite3", "file:"+other)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, err = db.Exec("CREATE TABLE notes (text TEXT)")
+		mustDo(t, func() error { return errors.Join(err, db.Close()) })
+		err = Restore(RestoreParams{File: other, Target: a.Path()})
+		if err == nil || !strings.Contains(err.Error(), "not a moolah book") {
+			t.Fatalf("got %v", err)
+		}
+		rep, err := a.Balances(ctx, BalanceParams{})
+		if err != nil || !rep.NetWorth.Equal(dec("25000")) {
+			t.Fatalf("book changed: %s, %v", rep.NetWorth, err)
+		}
 	})
 }
 

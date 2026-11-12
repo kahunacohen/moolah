@@ -694,7 +694,10 @@ moolah backup                                   # → backups/moolah-2026-11-04T
 moolah config set backup_recipient "$(cat ~/.ssh/id_ed25519.pub)"   # use an SSH key, no passphrase
 moolah restore backups/moolah-2026-11-04T10-30.db.age               # asks before replacing the current DB
 moolah restore FILE --db /tmp/test.db           # restore to another file, to look at it
+moolah restore --book old ~/old-computer/main.db   # a plain copy of a book file also works
 ```
+
+- `restore` accepts an encrypted backup or a plain book file (`.db`), for example a copy from another computer or the copy made before an upgrade. A plain file is read, not changed; changes still in its `-wal` file are included. moolah checks the copy first and refuses a damaged file or a database that is not a moolah book.
 
 - Without `backup_recipient`, every backup asks for a passphrase. For scripts, set the `MOOLAH_PASSPHRASE` environment variable instead.
 - You can also decrypt a backup by hand with the `age` tool: `age -d -i ~/.ssh/id_ed25519 FILE > moolah.db`.
@@ -724,7 +727,7 @@ moolah restore FILE --db /tmp/test.db           # restore to another file, to lo
 ## Upgrades and database migrations
 
 - Replace the binary. On the first run, moolah updates the book's schema automatically if needed, in one transaction: if anything fails, the book stays as it was.
-- **Before the upgrade, moolah copies the book** to the backup folder (`pre-migrate-v1-to-v2-<time>.db.age`). The copy is encrypted with `backup_recipient`. A book without a backup key gets a **plain** copy (`.db`), because moolah cannot ask for a passphrase while opening a book; delete it when the new version works.
+- **Before the upgrade, moolah copies the book** to the backup folder (`pre-migrate-v1-to-v2-<time>.db.age`). The copy is encrypted with `backup_recipient`. A book without a backup key gets a **plain** copy (`.db`), because moolah cannot ask for a passphrase while opening a book; delete it when the new version works. To go back, install the older moolah and `moolah restore` the copy.
 - An older binary refuses to open a book from a newer version, with a clear error.
 - **With sync, upgrade all your computers.** After one computer upgrades, its next change uploads data in the new format. A computer with the older moolah then stops with "Upgrade moolah on this computer" and does not change its local data.
 - `moolah --version` shows the binary version.

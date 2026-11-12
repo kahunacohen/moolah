@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -101,14 +102,34 @@ func (a *App) plainCopy(ctx context.Context) (string, func(), error) {
 
 // RestoreParams controls a restore.
 type RestoreParams struct {
-	File         string                 // the .age backup
+	File         string                 // an encrypted backup (.db.age) or a plain book file (.db)
 	IdentityFile string                 // age or SSH private key
 	Passphrase   func() (string, error) // asked for passphrase-encrypted backups and SSH keys
 	Target       string                 // book file to write
 }
 
-// Restore decrypts a backup into Target, replacing it. The caller confirms first.
+// Restore replaces Target with a backup: an encrypted one, or a plain copy of a
+// book such as the one made before a schema upgrade. The caller confirms first.
 func Restore(p RestoreParams) error {
+	if err := os.MkdirAll(filepath.Dir(p.Target), 0o700); err != nil {
+		return err
+	}
+	tmp := p.Target + ".restore"
+	_ = os.Remove(tmp)
+	plain, err := isSQLite(p.File)
+	if err != nil {
+		return err
+	}
+	if plain {
+		if err := store.CopyBook(p.File, tmp); err != nil {
+			return err
+		}
+		err := replaceDB(tmp, p.Target)
+		if errors.Is(err, store.ErrNotBook) {
+			return fmt.Errorf("%s is a database, but not a moolah book", p.File)
+		}
+		return err
+	}
 	scrypt, err := crypt.UsesPassphrase(p.File)
 	if err != nil {
 		return err
@@ -128,20 +149,30 @@ func Restore(p RestoreParams) error {
 	} else if ids, err = crypt.LoadIdentities(p.IdentityFile, p.Passphrase); err != nil {
 		return err
 	}
-	if err := os.MkdirAll(filepath.Dir(p.Target), 0o700); err != nil {
-		return err
-	}
-	tmp := p.Target + ".restore"
-	_ = os.Remove(tmp)
 	if err := crypt.DecryptFile(p.File, tmp, ids); err != nil {
 		return err
 	}
 	return replaceDB(tmp, p.Target)
 }
 
+// isSQLite reports whether the file starts with the SQLite file header.
+func isSQLite(path string) (bool, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return false, err
+	}
+	defer f.Close()
+	head := make([]byte, 16)
+	n, err := io.ReadFull(f, head)
+	if err != nil && !errors.Is(err, io.ErrUnexpectedEOF) && !errors.Is(err, io.EOF) {
+		return false, err
+	}
+	return string(head[:n]) == "SQLite format 3\x00", nil
+}
+
 // replaceDB checks that src is a healthy moolah database and moves it over dst.
 func replaceDB(src, dst string) error {
-	st, err := store.Open(src, store.OpenOptions{})
+	st, err := store.Open(src, store.OpenOptions{RequireBook: true})
 	if err == nil {
 		var problems []string
 		problems, err = st.IntegrityProblems(context.Background())

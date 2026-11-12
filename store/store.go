@@ -14,7 +14,10 @@ import (
 	_ "github.com/ncruces/go-sqlite3/driver" // registers the "sqlite3" driver
 )
 
-// ErrNewerSchema is returned when the file was written by a newer moolah.
+// ErrNotBook is returned with RequireBook for a database that moolah did not create.
+var ErrNotBook = errors.New("this is not a moolah book")
+
+// ErrNewerSchema is returned when the book was written by a newer moolah.
 var ErrNewerSchema = errors.New("this book was created by a newer version of moolah; upgrade moolah to open it")
 
 // ErrVersionConflict is returned when a transaction changed after it was loaded.
@@ -51,6 +54,7 @@ type Tx struct {
 type OpenOptions struct {
 	BeforeMigrate func(s *Store, from, to int) error // called before upgrading an existing file
 	Create        bool                               // create the file if it does not exist
+	RequireBook   bool                               // the file must already be a moolah book (no new schema is written)
 }
 
 // Open opens (and if needed creates and migrates) the database at path.
@@ -76,6 +80,16 @@ func Open(path string, opts OpenOptions) (*Store, error) {
 		return nil, err
 	}
 	s := &Store{Q: Q{q: db}, db: db, path: path}
+	if opts.RequireBook {
+		v, err := s.schemaVersion(context.Background())
+		if err == nil && v == 0 {
+			err = ErrNotBook
+		}
+		if err != nil {
+			_ = db.Close()
+			return nil, err
+		}
+	}
 	if err := s.migrate(opts.BeforeMigrate); err != nil {
 		_ = db.Close()
 		return nil, err
@@ -114,6 +128,20 @@ func (s *Store) InTx(ctx context.Context, fn func(tx *Tx) error) error {
 func (s *Store) VacuumInto(ctx context.Context, path string) error {
 	_, err := s.db.ExecContext(ctx, "VACUUM INTO ?", path)
 	return err
+}
+
+// CopyBook copies the SQLite file src to dst with VACUUM INTO, including changes
+// still in src's write-ahead log. src is opened read-only and is not migrated.
+func CopyBook(src, dst string) error {
+	db, err := sql.Open("sqlite3", "file:"+(&url.URL{Path: src}).EscapedPath()+"?mode=ro")
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+	if _, err := db.Exec("VACUUM INTO ?", dst); err != nil {
+		return fmt.Errorf("read %s: %w", src, err)
+	}
+	return nil
 }
 
 // IntegrityProblems runs SQLite's integrity and foreign key checks.
