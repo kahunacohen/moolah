@@ -32,9 +32,9 @@ func (s *Server) names(r *http.Request, real bool) ([]string, error) {
 		switch {
 		case a.IsRoot() || a.IsClosed():
 		case real && a.Type.IsReal() && !a.IsGroup():
-			out = append(out, tree.Path(a.ID))
+			out = append(out, tree.Name(a.ID))
 		case !real && (a.Type.IsCategory() || (a.Type.IsReal() && !a.IsGroup())):
-			out = append(out, app.DisplayName(tree, a.ID, app.ScopeCategory))
+			out = append(out, tree.Name(a.ID))
 		}
 	})
 	return out, nil
@@ -180,7 +180,7 @@ func (s *Server) editData(r *http.Request, t core.Transaction) (editData, error)
 	}
 	d := editData{Date: t.Date.String(), ID: t.ID, Note: t.Note, Payee: t.Payee, Tags: strings.Join(t.Tags, ", "), Version: t.Version}
 	for _, p := range t.Postings {
-		l := editLine{Account: tree.Path(p.AccountID), Amount: p.Amount.Value.StringFixed(p.Amount.Currency.Scale()), Currency: string(p.Amount.Currency)}
+		l := editLine{Account: tree.Name(p.AccountID), Amount: p.Amount.Value.StringFixed(p.Amount.Currency.Scale()), Currency: string(p.Amount.Currency)}
 		if p.Cost != nil {
 			l.Cost, l.CostCurrency = p.Cost.Value.StringFixed(p.Cost.Currency.Scale()), string(p.Cost.Currency)
 		}
@@ -189,7 +189,7 @@ func (s *Server) editData(r *http.Request, t core.Transaction) (editData, error)
 	d.Lines = append(d.Lines, editLine{}, editLine{})
 	tree.Walk(func(a core.Account) {
 		if !a.IsGroup() {
-			d.Accounts = append(d.Accounts, tree.Path(a.ID))
+			d.Accounts = append(d.Accounts, tree.Name(a.ID))
 		}
 	})
 	return d, nil

@@ -34,7 +34,7 @@ func (g *globals) completeAccounts(scope app.Scope) func(*cobra.Command, []strin
 						return
 					}
 				}
-				out = append(out, app.DisplayName(tree, acct.ID, scope))
+				out = append(out, tree.Name(acct.ID))
 			})
 			return nil
 		})
@@ -70,12 +70,12 @@ func (g *globals) printTree(a *app.App, cmd *cobra.Command, types []core.Account
 		var walk func(id int64, depth int)
 		walk = func(id int64, depth int) {
 			for _, c := range tree.Children(id) {
-				name := app.DisplayName(tree, c.ID, scope)
+				name := tree.Path(c.ID)
 				if g.format == "table" {
 					name = strings.Repeat("  ", depth) + c.Name
 				}
 				t.add(name, string(c.Currency), c.ClosedOn.String())
-				js = append(js, accountJSON{Account: app.DisplayName(tree, c.ID, scope), ClosedOn: c.ClosedOn.String(),
+				js = append(js, accountJSON{Account: tree.Path(c.ID), ClosedOn: c.ClosedOn.String(),
 					Currency: string(c.Currency), Type: string(c.Type)})
 				walk(c.ID, depth+1)
 			}

@@ -87,7 +87,7 @@ func importCmd(g *globals) *cobra.Command {
 				}
 				t := &table{headers: []string{"ID", "When", "File", "Account", "Profile", "Rows", "Created"}, right: map[int]bool{0: true, 5: true, 6: true}}
 				for _, b := range batches {
-					t.add(strconv.FormatInt(b.ID, 10), b.Created, b.File, tree.Path(b.AccountID), b.Profile,
+					t.add(strconv.FormatInt(b.ID, 10), b.Created, b.File, tree.Name(b.AccountID), b.Profile,
 						strconv.Itoa(b.Rows), strconv.Itoa(b.Transactions))
 				}
 				return g.render(t, batches)

@@ -44,7 +44,7 @@ func TestHistory(t *testing.T) {
 			t.Errorf("add summary %q", got)
 		}
 		added := strings.Join(h[2].Entries[0].Details, "\n")
-		for _, want := range []string{"payee: Shufersal", "+ assets:bank:leumi  -200.00 ILS", "+ expenses:food  200.00 ILS"} {
+		for _, want := range []string{"payee: Shufersal", "+ leumi  -200.00 ILS", "+ food  200.00 ILS"} {
 			if !strings.Contains(added, want) {
 				t.Errorf("add details lack %q:\n%s", want, added)
 			}
@@ -54,7 +54,7 @@ func TestHistory(t *testing.T) {
 		}
 		// The lines are deleted by the database (ON DELETE CASCADE); history keeps them too.
 		deleted := strings.Join(h[0].Entries[0].Details, "\n")
-		if h[0].Entries[0].Op != HistoryDeleted || !strings.Contains(deleted, "- assets:bank:leumi  -200.00 ILS") {
+		if h[0].Entries[0].Op != HistoryDeleted || !strings.Contains(deleted, "- leumi  -200.00 ILS") {
 			t.Errorf("delete %+v", h[0].Entries)
 		}
 	})

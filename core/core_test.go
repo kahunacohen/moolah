@@ -3,6 +3,7 @@ package core
 
 import (
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/shopspring/decimal"
@@ -91,8 +92,27 @@ func TestResolve(t *testing.T) {
 	t.Run("typo gives suggestions", func(t *testing.T) {
 		_, err := tree.Resolve("restaurnts", nil)
 		var unk *UnknownAccountError
-		if !errors.As(err, &unk) || len(unk.Suggestions) == 0 || unk.Suggestions[0] != "expenses:food:restaurants" {
+		if !errors.As(err, &unk) || len(unk.Suggestions) == 0 || unk.Suggestions[0] != "restaurants" {
 			t.Fatalf("got %v", err)
+		}
+	})
+	// What moolah shows is what users type back: every shown name resolves to its
+	// account, and a name that two accounts share is shown as the full path.
+	t.Run("shown names resolve back", func(t *testing.T) {
+		tree.Walk(func(a Account) {
+			got, err := tree.Resolve(tree.Name(a.ID), nil)
+			if err != nil || got.ID != a.ID {
+				t.Errorf("%s is shown as %q, which resolves to %+v, %v", tree.Path(a.ID), tree.Name(a.ID), got, err)
+			}
+		})
+		var shared int
+		tree.Walk(func(a Account) {
+			if strings.Contains(tree.Name(a.ID), ":") {
+				shared++
+			}
+		})
+		if shared == 0 {
+			t.Error("the test tree needs two accounts with the same name")
 		}
 	})
 	// A filter limits matches, which also resolves ambiguity (categories only see expenses/income).

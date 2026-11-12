@@ -597,7 +597,7 @@ func fingerprints(path string) (map[string]int, error) {
 func txFingerprint(tree *core.Tree, t core.Transaction) string {
 	lines := make([]string, 0, len(t.Postings))
 	for _, p := range t.Postings {
-		lines = append(lines, tree.Path(p.AccountID)+"="+p.Amount.String())
+		lines = append(lines, tree.Name(p.AccountID)+"="+p.Amount.String())
 	}
 	sort.Strings(lines)
 	return t.Date.String() + "|" + t.Payee + "|" + strings.Join(lines, ";")

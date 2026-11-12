@@ -218,7 +218,7 @@ func TestPages(t *testing.T) {
 		}
 		form := url.Values{"category": {"restaurants"}, "version": {itoa(tx.Version)}}
 		w := s.do(t, req{method: "POST", path: "/review/" + itoa(tx.ID), cookie: true, csrf: true, form: form, htmx: true})
-		if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "food:restaurants") {
+		if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "restaurants") {
 			t.Fatalf("code %d body %s", w.Code, w.Body)
 		}
 	})

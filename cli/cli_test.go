@@ -464,7 +464,7 @@ func TestEditFormat(t *testing.T) {
 	})
 	// A typo in an account name is reported with the line number, not saved.
 	t.Run("unknown account reported", func(t *testing.T) {
-		text := strings.Replace(formatTx(tree, orig), "assets:leumi", "assets:leumy", 1)
+		text := strings.Replace(formatTx(tree, orig), "leumi ", "leumy ", 1)
 		if _, err := parseTx(tree, text, orig); err == nil || !strings.Contains(err.Error(), "line") {
 			t.Fatalf("got %v", err)
 		}

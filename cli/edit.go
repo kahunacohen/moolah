@@ -29,12 +29,12 @@ func formatTx(tree *core.Tree, t core.Transaction) string {
 	b.WriteString("lines:\n")
 	width := 0
 	for _, p := range t.Postings {
-		if n := len([]rune(tree.Path(p.AccountID))); n > width {
+		if n := len([]rune(tree.Name(p.AccountID))); n > width {
 			width = n
 		}
 	}
 	for _, p := range t.Postings {
-		path := tree.Path(p.AccountID)
+		path := tree.Name(p.AccountID)
 		line := fmt.Sprintf("  %s%s  %s %s", path, strings.Repeat(" ", width-len([]rune(path))),
 			p.Amount.Value.StringFixed(p.Amount.Currency.Scale()), p.Amount.Currency)
 		if p.Cost != nil {

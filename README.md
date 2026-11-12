@@ -58,7 +58,7 @@ moolah keeps track of your bank accounts, credit cards and retirement accounts i
 
 **Categories** describe where money comes from or goes to: `food`, `rent`, `salary`. A category can be in another one (`restaurants` is in `food`). A category has no currency. It can collect spending in any currency.
 
-**Names are unique.** No two accounts have the same name, and no two spending (or income) categories do. So the name alone is always enough: `moolah add checking -85 restaurants`.
+**Names are unique.** No two accounts have the same name, and no two spending (or income) categories do. So the name alone is always enough: `moolah add checking -85 restaurants`. moolah shows names the same way. Only when a spending and an income category share a name (`gifts`) does it show the full name, `expenses:gifts` or `income:gifts`, which you can also type.
 
 **Every transaction moves money from one place to another.** Buying groceries moves money from your bank account to the `food` category. Paying your credit card moves money from your bank account to the card. moolah records both sides, so totals always add up. (Inside, moolah uses double-entry bookkeeping. You don't need to know it to use moolah.)
 
@@ -173,7 +173,7 @@ moolah category close golf --date 2026-12-31
 - You can record directly on a parent (`food`) if no subcategory fits.
 - A name that doesn't exist is an **error** with suggestions:
   ```
-  error: unknown category "restaurnts". Did you mean food:restaurants?
+  error: unknown account "restaurnts". Did you mean restaurants?
   ```
   To add a new category, use `moolah category add`.
 - `uncategorized` exists by default. Imported rows that no rule matches go there until you review them.
@@ -358,7 +358,7 @@ moolah add "pension fund" 2400 salary:pension --date 2026-02-10 --payee "Employe
 moolah value "pension fund" 412300 --date 2026-10-31
 ```
 
-`moolah value` compares the value with the account balance and records only the difference as investment gain or loss (`income:invest:gains`). So:
+`moolah value` compares the value with the account balance and records only the difference as investment gain or loss (the income category `gains`). So:
 
 > gain for a period = change in value − deposits
 
@@ -426,7 +426,7 @@ Net worth 2026-01-01                    412,300 €
 Net worth 2026-10-31                    460,450 €
 ```
 
-**Output formats:** `--format table` (default), `--format csv`, `--format json`. Use CSV or JSON to process the data with other tools. They always write numbers as `1234.56`, whatever your language setting. In CSV, a column of amounts becomes two columns, the number and its currency, so a spreadsheet can add them up. Accounts and categories show their full path (`assets:bank:leumi`), because CSV has no indentation. Group rows (`assets:bank`) are subtotals: filter them out before you add up a column.
+**Output formats:** `--format table` (default), `--format csv`, `--format json`. Use CSV or JSON to process the data with other tools. They always write numbers as `1234.56`, whatever your language setting. In CSV, a column of amounts becomes two columns, the number and its currency, so a spreadsheet can add them up. Account and category lists and the balance and income reports show full names (`assets:bank:leumi`), because CSV has no indentation to show the tree. Group rows (`assets:bank`) are subtotals: filter them out before you add up a column.
 
 ## Reconciling with a statement
 
@@ -488,15 +488,15 @@ Action 7  2026-11-04 12:00  on laptop-1a2b
   transaction 2 deleted
     date: 2026-10-02
     payee: Cafe
-    - assets:bank:leumi  -50.00 ILS
-    - expenses:eat  50.00 ILS
+    - leumi  -50.00 ILS
+    - eat  50.00 ILS
 
 $ moolah history --tx 2                     # every action that changed transaction 2
 ```
 
 - Each command is one action. An import is one action, and so is a change in the browser (shown as `browser: POST /tx/5`).
 - Changed fields are shown as `payee: Shufersal → Rami Levy`. Lines of a transaction that were added or removed are shown with `+` and `-`.
-- Account and category names are shown as they are **today**. After `category rename food eat`, older history shows `expenses:eat`.
+- Account and category names are shown as they are **today**. After `category rename food eat`, older history shows `eat`.
 - History keeps transactions, accounts, categories, tags, settings, rules, import profiles and rate sources. Downloaded exchange rates are not kept: download them again.
 - History is in the book, so it moves with sync and is in your backups.
 - **Deleted data stays in history.** To really remove old data, delete the history before a date: `moolah history prune --before 2026-01-01`. Your data does not change. With sync, your other computers drop the same history.
@@ -688,10 +688,10 @@ When you have more than one book, reports and the browser UI show the book name 
 | Message | Meaning and fix |
 |---|---|
 | `unknown account "X". Did you mean …?` | The name doesn't exist. Use the suggestion, or create it with `account add` / `category add`. |
-| `"food" is ambiguous: expenses:food, income:food` | A short name matches more than one. Write more of the name. |
+| `"gifts" is ambiguous: expenses:gifts, income:gifts` | A spending category and an income category have this name. Write the full name, as shown. |
 | `transaction does not balance: USD +12.00` | The lines don't add up to zero in that currency. Check the amounts. |
 | `no USD→EUR rate on or before 2026-09-14` | No rate is stored and moolah couldn't download one. Connect to the network and run `moolah rates fetch`, or add the rate with `moolah rates add`. |
-| `account card:old is closed since 2026-10-31` | The transaction date is after the close date. |
+| `account old-card is closed since 2026-10-31` | The transaction date is after the close date. |
 | `conflict: laptop and desktop both changed data` | See [Working on different machines](#working-on-different-machines). Choose a copy with `moolah sync resolve`. |
 | `changed elsewhere, reload` (browser) | The transaction was changed in another tab or by a CLI command after you opened it. Reload the page and edit again. |
 | `… is not empty. Export into a new folder` | `moolah export` writes only into a new or empty folder. Give another folder name. |

@@ -162,7 +162,7 @@ func (a *App) Register(ctx context.Context, p RegisterParams) (RegisterReport, e
 		if err != nil {
 			return RegisterReport{}, err
 		}
-		rep.Account = tree.Path(acct.ID)
+		rep.Account = tree.Name(acct.ID)
 		for _, id := range tree.Subtree(acct.ID) {
 			selected[id] = true
 			filter.AccountIDs = append(filter.AccountIDs, id)
@@ -193,7 +193,7 @@ func (a *App) Register(ctx context.Context, p RegisterParams) (RegisterReport, e
 			if selected[ps.AccountID] {
 				continue
 			}
-			others = append(others, tree.Path(ps.AccountID))
+			others = append(others, tree.Name(ps.AccountID))
 			if p.Account == "" && ps.Amount.Value.Sign() > 0 {
 				row.Amount.Add(ps.Amount.Currency, ps.Amount.Value)
 			}

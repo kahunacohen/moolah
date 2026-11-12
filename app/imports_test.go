@@ -55,7 +55,7 @@ func TestImport(t *testing.T) {
 			t.Fatalf("applied %d, %v", n, err)
 		}
 		res := importOK(t, a, ImportParams{File: csvFile(t, "2026-10-09,SHUFERSAL DEAL 456,-150"), Account: "leumi"})
-		if res.Uncategorized != 0 || res.Rows[0].Category != "food:groceries" {
+		if res.Uncategorized != 0 || res.Rows[0].Category != "groceries" {
 			t.Fatalf("got %+v", res.Rows)
 		}
 		items, _ := a.Review(ctx)
@@ -150,7 +150,7 @@ func TestImport(t *testing.T) {
 		}
 		importOK(t, a, ImportParams{File: csvFile(t, "2026-10-01,Coffee,-12"), Account: "leumi"})
 		res := importOK(t, a, ImportParams{File: csvFile(t, "2026-10-02,Tea,-9")})
-		if res.Account != "assets:bank:leumi" {
+		if res.Account != "leumi" {
 			t.Fatalf("account %q", res.Account)
 		}
 	})
@@ -178,7 +178,7 @@ func TestReviewAndReconcile(t *testing.T) {
 			t.Fatalf("items %d, %v", len(items), err)
 		}
 		name, err := a.Categorize(ctx, CategorizeParams{TxID: items[0].Tx.ID, Category: "restaurants"})
-		if err != nil || name != "food:restaurants" {
+		if err != nil || name != "restaurants" {
 			t.Fatalf("got %q, %v", name, err)
 		}
 	})

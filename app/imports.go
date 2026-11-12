@@ -261,7 +261,7 @@ func (a *App) Import(ctx context.Context, p ImportParams) (ImportResult, error) 
 		if err != nil {
 			return err
 		}
-		res.Account = tree.Path(acct.ID)
+		res.Account = tree.Name(acct.ID)
 		uncat, ok := tree.Find(accountUncategorized)
 		if !ok {
 			return fmt.Errorf("the category uncategorized is missing. Create it with: moolah category add uncategorized")
@@ -310,7 +310,7 @@ func (a *App) Import(ctx context.Context, p ImportParams) (ImportResult, error) 
 					target, tags = t, m.Tags
 				}
 			}
-			row.Category = DisplayName(tree, target.ID, ScopeCategory)
+			row.Category = tree.Name(target.ID)
 			if target.ID == uncat.ID {
 				res.Uncategorized++
 			}
@@ -604,8 +604,8 @@ func (a *App) WaitingTransfers(ctx context.Context) ([]WaitingTransfer, error) {
 	out := make([]WaitingTransfer, 0, len(waiting))
 	for _, w := range waiting {
 		target, _ := tree.Get(w.Target)
-		item := WaitingTransfer{Account: tree.Path(w.Account), Amount: w.Amount, Date: w.Date, ID: w.ImportRowID,
-			Payee: w.Payee, Target: tree.Path(w.Target), TargetCur: target.Currency}
+		item := WaitingTransfer{Account: tree.Name(w.Account), Amount: w.Amount, Date: w.Date, ID: w.ImportRowID,
+			Payee: w.Payee, Target: tree.Name(w.Target), TargetCur: target.Currency}
 		if c := counterparts(waiting, w); len(c) == 1 {
 			s := core.NewAmount(c[0].Amount.Value.Abs(), c[0].Amount.Currency)
 			item.Suggested = &s
@@ -650,7 +650,7 @@ func (a *App) CompleteTransfer(ctx context.Context, p CompleteTransferParams) (c
 			return err
 		}
 		if v.Sign() <= 0 {
-			return fmt.Errorf("give the amount on %s as a positive number", tree.Path(target.ID))
+			return fmt.Errorf("give the amount on %s as a positive number", tree.Name(target.ID))
 		}
 		if mine.Amount.Value.Sign() > 0 {
 			v = v.Neg()
@@ -696,7 +696,7 @@ func (a *App) importAccount(ctx context.Context, tx *store.Tx, tree *core.Tree, 
 	}
 	var names []string
 	for _, id := range ids {
-		names = append(names, tree.Path(id))
+		names = append(names, tree.Name(id))
 	}
 	return core.Account{}, fmt.Errorf("profile %s is used for several accounts (%s); choose one with --account", profile, strings.Join(names, ", "))
 }
@@ -803,7 +803,7 @@ func (a *App) Rules(ctx context.Context) ([]RuleView, error) {
 	}
 	out := make([]RuleView, 0, len(rows))
 	for _, r := range rows {
-		out = append(out, RuleView{Account: DisplayName(tree, r.AccountID, ScopeCategory), ID: r.ID, MaxAmount: r.MaxAmount,
+		out = append(out, RuleView{Account: tree.Name(r.AccountID), ID: r.ID, MaxAmount: r.MaxAmount,
 			MinAmount: r.MinAmount, Pattern: r.Pattern, Tags: r.Tags})
 	}
 	return out, nil
@@ -923,7 +923,7 @@ func (a *App) Review(ctx context.Context) ([]ReviewItem, error) {
 		if !ok {
 			continue
 		}
-		out = append(out, ReviewItem{Account: tree.Path(t.Postings[own].AccountID), Amount: t.Postings[own].Amount, Tx: t})
+		out = append(out, ReviewItem{Account: tree.Name(t.Postings[own].AccountID), Amount: t.Postings[own].Amount, Tx: t})
 	}
 	return out, nil
 }
@@ -966,7 +966,7 @@ func (a *App) Categorize(ctx context.Context, p CategorizeParams) (string, error
 		if err := t.Validate(tree); err != nil {
 			return err
 		}
-		name = DisplayName(tree, target.ID, ScopeCategory)
+		name = tree.Name(target.ID)
 		return tx.UpdateTransaction(ctx, t)
 	})
 	return name, err
@@ -1039,11 +1039,11 @@ func (a *App) Reconcile(ctx context.Context, p ReconcileParams) (ReconcileResult
 		return res, err
 	}
 	for _, w := range waiting {
-		if w.Account == tree.Path(acct.ID) && !w.Date.After(date) {
+		if w.Account == tree.Name(acct.ID) && !w.Date.After(date) {
 			res.Waiting = append(res.Waiting, w)
 		}
 	}
-	reg, err := a.Register(ctx, RegisterParams{Account: tree.Path(acct.ID), To: date})
+	reg, err := a.Register(ctx, RegisterParams{Account: tree.Name(acct.ID), To: date})
 	if err != nil {
 		return res, err
 	}

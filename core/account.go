@@ -113,6 +113,7 @@ type Tree struct {
 	byID     map[int64]*Account
 	byPath   map[string]*Account // lower-case full path
 	children map[int64][]int64
+	names    map[string]int // how many accounts have each lower-case name
 	paths    map[int64]string
 }
 
@@ -122,10 +123,12 @@ func NewTree(accounts []Account) *Tree {
 		byID:     map[int64]*Account{},
 		byPath:   map[string]*Account{},
 		children: map[int64][]int64{},
+		names:    map[string]int{},
 		paths:    map[int64]string{},
 	}
 	for i := range accounts {
 		a := accounts[i]
+		t.names[strings.ToLower(a.Name)]++
 		t.byID[a.ID] = &a
 		t.children[a.ParentID] = append(t.children[a.ParentID], a.ID)
 	}
@@ -159,6 +162,20 @@ func (t *Tree) Get(id int64) (Account, bool) {
 
 // Path returns the full name of an account, for example "assets:bank:leumi".
 func (t *Tree) Path(id int64) string { return t.paths[id] }
+
+// Name is how people see an account: its own name ("checking"), or its full path
+// when another account or category has the same name (income:gifts, expenses:gifts).
+// Either one resolves back to the account.
+func (t *Tree) Name(id int64) string {
+	a, ok := t.byID[id]
+	if !ok {
+		return ""
+	}
+	if t.names[strings.ToLower(a.Name)] > 1 {
+		return t.paths[id]
+	}
+	return a.Name
+}
 
 // Find returns the account with exactly this full path (case-insensitive).
 func (t *Tree) Find(path string) (Account, bool) {
@@ -274,7 +291,7 @@ func (t *Tree) suggest(in string, ok func(*Account) bool) []string {
 			}
 		}
 		if best <= limit {
-			cands = append(cands, cand{best, p})
+			cands = append(cands, cand{best, t.Name(id)})
 		}
 	}
 	sort.Slice(cands, func(i, j int) bool {

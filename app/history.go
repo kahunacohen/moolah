@@ -357,19 +357,15 @@ func (f *historyFormatter) subject(table, key string, r historyRow) (HistoryKind
 	return HistoryKind(table), key
 }
 
-// accountPath is the account's path today, or for a deleted account, its parent's
-// path today and its own name then.
+// accountPath is the account's name today, or for a deleted account, its name then.
 func (f *historyFormatter) accountPath(id int64, r historyRow) string {
-	if p := f.tree.Path(id); p != "" {
+	if p := f.tree.Name(id); p != "" {
 		return p
 	}
 	if r == nil {
 		return fmt.Sprintf("#%d", id)
 	}
-	if parent := f.tree.Path(r.id("parent_id")); parent != "" {
-		return parent + ":" + r.str("name")
-	}
-	return r.str("name")
+	return r.str("name") + " (deleted)"
 }
 
 func (f *historyFormatter) account(col string, r historyRow) string {
@@ -377,7 +373,7 @@ func (f *historyFormatter) account(col string, r historyRow) string {
 	if id == 0 {
 		return ""
 	}
-	if p := f.tree.Path(id); p != "" {
+	if p := f.tree.Name(id); p != "" {
 		return p
 	}
 	return fmt.Sprintf("#%d (deleted)", id)

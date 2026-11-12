@@ -83,7 +83,7 @@ func (t Transaction) Validate(tree *Tree) error {
 		if !ok {
 			return fmt.Errorf("posting refers to account ID %d, which does not exist", p.AccountID)
 		}
-		path := tree.Path(a.ID)
+		path := tree.Name(a.ID)
 		if a.IsGroup() {
 			return fmt.Errorf("%s is a group without a currency and cannot receive transactions; use one of its sub-accounts", path)
 		}

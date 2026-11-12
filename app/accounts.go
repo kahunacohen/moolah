@@ -29,16 +29,6 @@ func (s Scope) filter() core.ResolveFilter {
 	return func(a core.Account) bool { return !a.IsRoot() }
 }
 
-// DisplayName is how users see an account in a scope: categories without "expenses:".
-func DisplayName(tree *core.Tree, id int64, scope Scope) string {
-	p := tree.Path(id)
-	a, _ := tree.Get(id)
-	if scope == ScopeCategory && a.Type == core.Expenses {
-		return strings.TrimPrefix(p, "expenses:")
-	}
-	return p
-}
-
 // AddAccountParams describes a new real account.
 type AddAccountParams struct {
 	Currency    string // required; it cannot change later
@@ -321,10 +311,10 @@ func insertAccount(ctx context.Context, tx *store.Tx, typ core.AccountType, part
 		return core.Account{}, fmt.Errorf("%s does not exist", parentPath)
 	}
 	if !parent.IsRoot() && parent.Type.IsReal() && parent.Currency != "" {
-		return core.Account{}, fmt.Errorf("%s holds money, so it cannot have sub-accounts", tree.Path(parent.ID))
+		return core.Account{}, fmt.Errorf("%s holds money, so it cannot have sub-accounts", tree.Name(parent.ID))
 	}
 	if parent.IsClosed() {
-		return core.Account{}, fmt.Errorf("%s is closed", tree.Path(parent.ID))
+		return core.Account{}, fmt.Errorf("%s is closed", tree.Name(parent.ID))
 	}
 	acct := core.Account{Currency: cur, Name: parts[len(parts)-1], ParentID: parent.ID, Type: typ}
 	id, err := tx.InsertAccount(ctx, acct)
@@ -367,7 +357,10 @@ func uniqueName(tree *core.Tree, typ core.AccountType, name string, except int64
 	case dup.Type == core.Income:
 		what = "an income category"
 	}
-	return fmt.Errorf("%s is already the name of %s (%s). Names must be unique, so choose another name", name, what, tree.Path(dup.ID))
+	if parent, ok := tree.Get(dup.ParentID); ok && !parent.IsRoot() {
+		what += " in " + parent.Name
+	}
+	return fmt.Errorf("%s is already the name of %s. Names must be unique, so choose another name", name, what)
 }
 
 // RenameParams describes a rename or move.
@@ -406,7 +399,7 @@ func (a *App) RenameAccount(ctx context.Context, p RenameParams) (string, error)
 			return err
 		}
 		if core.AccountType(strings.ToLower(parts[0])) != old.Type || len(parts) < 2 {
-			return fmt.Errorf("%s must stay under %s", tree.Path(old.ID), old.Type)
+			return fmt.Errorf("%s must stay under %s", tree.Name(old.ID), old.Type)
 		}
 		parent, ok := tree.Find(strings.Join(parts[:len(parts)-1], ":"))
 		if !ok {
@@ -430,11 +423,11 @@ func moveAccount(ctx context.Context, tx *store.Tx, tree *core.Tree, acct core.A
 	}
 	for _, id := range tree.Subtree(acct.ID) {
 		if id == parent.ID {
-			return fmt.Errorf("cannot move %s under itself", tree.Path(acct.ID))
+			return fmt.Errorf("cannot move %s under itself", tree.Name(acct.ID))
 		}
 	}
 	if parent.Type.IsReal() && !parent.IsRoot() && parent.Currency != "" {
-		return fmt.Errorf("%s holds money, so it cannot have sub-accounts", tree.Path(parent.ID))
+		return fmt.Errorf("%s holds money, so it cannot have sub-accounts", tree.Name(parent.ID))
 	}
 	return tx.MoveAccount(ctx, acct.ID, parent.ID, name)
 }
@@ -461,7 +454,7 @@ func (a *App) MergeAccount(ctx context.Context, p MergeParams) (moved int, err e
 		if err != nil {
 			return err
 		}
-		fromPath, intoPath := tree.Path(from.ID), tree.Path(into.ID)
+		fromPath, intoPath := tree.Name(from.ID), tree.Name(into.ID)
 		switch {
 		case from.ID == into.ID:
 			return fmt.Errorf("cannot merge %s into itself", fromPath)
@@ -534,11 +527,11 @@ func (a *App) CloseAccount(ctx context.Context, p CloseParams) error {
 				return err
 			}
 			if last.After(date) {
-				return fmt.Errorf("%s has transactions after %s (last on %s)", tree.Path(id), date, last)
+				return fmt.Errorf("%s has transactions after %s (last on %s)", tree.Name(id), date, last)
 			}
 			if sub.Type.IsReal() && !balances[id].IsZero() {
 				return fmt.Errorf("%s has a balance of %s on %s; move it to another account first",
-					tree.Path(id), balances[id], date)
+					tree.Name(id), balances[id], date)
 			}
 			if err := tx.SetAccountClosed(ctx, id, date); err != nil {
 				return err

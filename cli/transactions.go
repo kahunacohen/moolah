@@ -44,7 +44,7 @@ func (g *globals) printSaved(a *app.App, cmd *cobra.Command, verb string, t core
 	}
 	fmt.Fprintln(g.out(), ":")
 	for _, p := range t.Postings {
-		line := fmt.Sprintf("  %-30s %s", tree.Path(p.AccountID), p.Amount)
+		line := fmt.Sprintf("  %-30s %s", tree.Name(p.AccountID), p.Amount)
 		if p.Cost != nil {
 			line += " (for " + p.Cost.String() + ")"
 		}

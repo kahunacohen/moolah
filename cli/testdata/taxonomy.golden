@@ -8,11 +8,11 @@ $ moolah account add leumi --kind bank --currency ILS --opening 1000 --date 2026
 Added account leumi (ILS).
 
 $ moolah account add Leumi --kind bank --currency ILS
-error: Leumi is already the name of an account (assets:bank:leumi). Names must be unique, so choose another name
+error: Leumi is already the name of an account in bank. Names must be unique, so choose another name
 [exit 1]
 
 $ moolah account add cash --kind cash --currency ILS
-error: cash is already the name of a kind of account (assets:cash). Names must be unique, so choose another name
+error: cash is already the name of a kind of account. Names must be unique, so choose another name
 [exit 1]
 
 $ moolah account add savings --currency ILS
@@ -61,37 +61,37 @@ error: expenses:nosuch does not exist
 [exit 1]
 
 $ moolah category add Groceries
-error: Groceries is already the name of a spending category (expenses:food:groceries). Names must be unique, so choose another name
+error: Groceries is already the name of a spending category in food. Names must be unique, so choose another name
 [exit 1]
 
 $ moolah add leumi -50 restuarants --date 2026-10-02
 Added transaction 2 on 2026-10-02:
-  assets:bank:leumi              -50.00 ILS
-  expenses:food:restuarants      50.00 ILS
+  leumi                          -50.00 ILS
+  restuarants                    50.00 ILS
 
 $ moolah category rename restuarants eating-out
 Renamed restuarants to eating-out.
 
 $ moolah register --category eating-out
-ID  Date        Payee  Other side            Amount    Balance
- 2  2026-10-02         assets:bank:leumi  50.00 ILS  50.00 ILS
+ID  Date        Payee  Other side     Amount    Balance
+ 2  2026-10-02         leumi       50.00 ILS  50.00 ILS
 
 $ moolah category merge eating-out restaurants
 Merged eating-out into restaurants (1 transaction line moved).
 
 $ moolah register --category restaurants
-ID  Date        Payee  Other side            Amount    Balance
- 2  2026-10-02         assets:bank:leumi  50.00 ILS  50.00 ILS
+ID  Date        Payee  Other side     Amount    Balance
+ 2  2026-10-02         leumi       50.00 ILS  50.00 ILS
 
 $ moolah account rename leumi checking
 Renamed leumi to checking.
 
 $ moolah account close checking --date 2026-10-31
-error: assets:bank:checking has a balance of 950.00 ILS on 2026-10-31; move it to another account first
+error: checking has a balance of 950.00 ILS on 2026-10-31; move it to another account first
 [exit 1]
 
 $ moolah add salary 100 food
-error: income:salary is a category; this needs a real account (assets or liabilities)
+error: salary is a category; this needs a real account (assets or liabilities)
 [exit 1]
 
 $ moolah category add bonus --in salary --income

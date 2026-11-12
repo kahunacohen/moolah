@@ -65,7 +65,7 @@ func postable(tree *core.Tree, name string) (core.Account, error) {
 		return core.Account{}, err
 	}
 	if acct.IsGroup() {
-		return core.Account{}, fmt.Errorf("%s is a group without a currency and cannot receive transactions; use one of its sub-accounts", tree.Path(acct.ID))
+		return core.Account{}, fmt.Errorf("%s is a group without a currency and cannot receive transactions; use one of its sub-accounts", tree.Name(acct.ID))
 	}
 	return acct, nil
 }
@@ -78,13 +78,13 @@ func realAccount(tree *core.Tree, name string) (core.Account, error) {
 		var unk *core.UnknownAccountError
 		if errors.As(err, &unk) {
 			if other, err2 := tree.Resolve(name, ScopeAny.filter()); err2 == nil && !other.Type.IsReal() {
-				return core.Account{}, fmt.Errorf("%s is a category; this needs a real account (assets or liabilities)", tree.Path(other.ID))
+				return core.Account{}, fmt.Errorf("%s is a category; this needs a real account (assets or liabilities)", tree.Name(other.ID))
 			}
 		}
 		return core.Account{}, err
 	}
 	if acct.IsGroup() {
-		return core.Account{}, fmt.Errorf("%s is a group without a currency and cannot receive transactions; use one of its sub-accounts", tree.Path(acct.ID))
+		return core.Account{}, fmt.Errorf("%s is a group without a currency and cannot receive transactions; use one of its sub-accounts", tree.Name(acct.ID))
 	}
 	return acct, nil
 }
@@ -204,7 +204,7 @@ func (a *App) AddPostings(ctx context.Context, p AddPostingsParams) (core.Transa
 			}
 			if acct.Type.IsReal() {
 				if cur != "" && cur != acct.Currency {
-					return fmt.Errorf("%s is a %s account; the line says %s", tree.Path(acct.ID), acct.Currency, cur)
+					return fmt.Errorf("%s is a %s account; the line says %s", tree.Name(acct.ID), acct.Currency, cur)
 				}
 				cur = acct.Currency
 				realCurs[cur] = true
@@ -216,7 +216,7 @@ func (a *App) AddPostings(ctx context.Context, p AddPostingsParams) (core.Transa
 			cur := l.cur
 			if cur == "" {
 				if len(realCurs) != 1 {
-					return fmt.Errorf("give a currency for %s, for example %s=120EUR", tree.Path(l.acct.ID), tree.Path(l.acct.ID))
+					return fmt.Errorf("give a currency for %s, for example %s=120EUR", tree.Name(l.acct.ID), tree.Name(l.acct.ID))
 				}
 				for c := range realCurs {
 					cur = c
@@ -300,7 +300,7 @@ func (a *App) Transfer(ctx context.Context, p TransferParams) (core.Transaction,
 		if from.Currency != to.Currency {
 			if p.ToAmount == "" {
 				return fmt.Errorf("%s is in %s and %s is in %s; give the amount that arrived with --to-amount",
-					tree.Path(from.ID), from.Currency, tree.Path(to.ID), to.Currency)
+					tree.Name(from.ID), from.Currency, tree.Name(to.ID), to.Currency)
 			}
 			toAmt, err := parseAmount(p.ToAmount, to.Currency)
 			if err != nil {
