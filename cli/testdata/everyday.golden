@@ -196,13 +196,13 @@ Net worth                     414.343,97
 $ moolah --format csv balance --date 2026-10-31
 Account,Balance,Balance currency,Value (ILS)
 assets,,,414500.00
-bank,,,24500.00
-leumi,24500.00,ILS,24500.00
-invest,,,390000.00
-pension,390000.00,ILS,390000.00
+assets:bank,,,24500.00
+assets:bank:leumi,24500.00,ILS,24500.00
+assets:invest,,,390000.00
+assets:invest:pension,390000.00,ILS,390000.00
 liabilities,,,-156.03
-card,,,-156.03
-chase,-42.17,USD,-156.03
+liabilities:card,,,-156.03
+liabilities:card:chase,-42.17,USD,-156.03
 ,,,
 Net worth,,,414343.97
 
@@ -213,4 +213,53 @@ ID,Date,Payee,Other side,Amount,Amount currency,Balance,Balance currency
 6,2026-10-20,Super-Pharm,"expenses:health, expenses:household",-300.00,ILS,24500.00,ILS
 7,2026-11-01,Transfer,"liabilities:card:chase, expenses:fees",-1545.00,ILS,22955.00,ILS
 5,2026-11-04,,expenses:food,-85.00,ILS,22870.00,ILS
+
+$ moolah --format csv report income --month 2026-10
+Category,Value (ILS)
+Income,
+invest,7600.00
+invest:gains,7600.00
+Total income,7600.00
+,
+Spending,
+food,200.00
+food:groceries,200.00
+health,180.00
+household,120.00
+shopping,156.03
+Total spending,656.03
+,
+Net (income − spending),6943.97
+
+$ moolah --format csv category list
+Name,Currency,Closed
+expenses (spending),,
+education,,
+fees,,
+food,,
+food:groceries,,
+food:restaurants,,
+gifts,,
+health,,
+household,,
+housing,,
+housing:rent,,
+shopping,,
+subscriptions,,
+taxes,,
+transport,,
+transport:fuel,,
+transport:public,,
+travel,,
+travel:flights,,
+uncategorized,,
+utilities,,
+income,,
+income:gifts,,
+income:interest,,
+income:invest,,
+income:invest:gains,,
+income:other,,
+income:salary,,
+income:salary:pension,,
 

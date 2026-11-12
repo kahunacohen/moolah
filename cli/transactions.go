@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
-	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -192,15 +191,11 @@ func balanceCmd(g *globals) *cobra.Command {
 					if !all && !r.HasAccounts && r.Depth > 0 {
 						continue
 					}
-					name := r.Account
-					if i := strings.LastIndex(name, ":"); i >= 0 {
-						name = name[i+1:]
-					}
 					native := ""
 					if r.Currency != "" {
 						native = core.NewAmount(r.Native[r.Currency], r.Currency).String()
 					}
-					t.add(strings.Repeat("  ", r.Depth)+name, native, core.FormatNumber(r.Value, rep.Currency.Scale()))
+					t.add(g.treeLabel(r.Account, r.Depth), native, core.FormatNumber(r.Value, rep.Currency.Scale()))
 					nj := map[string]string{}
 					for _, am := range r.Native.Amounts() {
 						nj[string(am.Currency)] = am.Value.String()

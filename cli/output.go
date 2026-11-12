@@ -64,13 +64,16 @@ var csvAmount = regexp.MustCompile(`^(-?[0-9]+(?:\.[0-9]+)?) ([A-Z]{3})$`)
 func (t *table) csv(w io.Writer) error {
 	split := make([]bool, len(t.headers))
 	for i := range t.headers {
-		split[i] = len(t.rows) > 0
 		for _, r := range t.rows {
 			c := strings.TrimSpace(r[i])
-			if c != "" && c != "0" && !csvAmount.MatchString(c) {
+			if c == "" || c == "0" {
+				continue
+			}
+			if !csvAmount.MatchString(c) {
 				split[i] = false
 				break
 			}
+			split[i] = true
 		}
 	}
 	line := func(cells []string, header bool) []string {

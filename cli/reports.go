@@ -121,14 +121,14 @@ func reportCmd(g *globals) *cobra.Command {
 				var inc, exp []rowJSON
 				t.add("Income", "")
 				for _, row := range r.Income {
-					t.add(strings.Repeat("  ", row.Depth)+leaf(row.Category, row.Depth), money(row.Value, c))
+					t.add(g.treeLabel(row.Category, row.Depth), money(row.Value, c))
 					inc = append(inc, rowJSON{row.Category, row.Value.String()})
 				}
 				t.add("Total income", money(r.TotalIncome, c))
 				t.add("", "")
 				t.add("Spending", "")
 				for _, row := range r.Expenses {
-					t.add(strings.Repeat("  ", row.Depth)+leaf(row.Category, row.Depth), money(row.Value, c))
+					t.add(g.treeLabel(row.Category, row.Depth), money(row.Value, c))
 					exp = append(exp, rowJSON{row.Category, row.Value.String()})
 				}
 				t.add("Total spending", money(r.TotalExpenses, c))
@@ -156,13 +156,18 @@ func reportCmd(g *globals) *cobra.Command {
 	return cmd
 }
 
-// leaf returns the last level of a category path for indented display.
-func leaf(path string, depth int) string {
+// treeLabel shows an account or category path in a report row. A table shows
+// the last level, indented by depth; CSV and JSON need the full path, because
+// they have no indentation to show where the row belongs.
+func (g *globals) treeLabel(path string, depth int) string {
+	if g.format != "table" {
+		return path
+	}
 	parts := strings.Split(path, ":")
 	if depth <= len(parts) {
-		return parts[len(parts)-1]
+		path = parts[len(parts)-1]
 	}
-	return path
+	return strings.Repeat("  ", depth) + path
 }
 
 func ratesCmd(g *globals) *cobra.Command {

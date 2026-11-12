@@ -142,6 +142,9 @@ func TestScenarios(t *testing.T) {
 		s.run("balance --date 2026-10-31")
 		s.run("--format csv balance --date 2026-10-31")
 		s.run("--format csv register leumi")
+		// CSV has no indentation, so tree rows carry the full path.
+		s.run("--format csv report income --month 2026-10")
+		s.run("--format csv category list")
 		s.golden("everyday")
 	})
 
