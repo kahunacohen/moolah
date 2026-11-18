@@ -11,6 +11,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"moolah/app"
+	"moolah/core"
 )
 
 func init() {
@@ -412,31 +413,34 @@ func (g *globals) reviewList(items []app.ReviewItem, waiting []app.WaitingTransf
 func (g *globals) reviewLoop(cmd *cobra.Command, a *app.App, items []app.ReviewItem) (bool, error) {
 	ctx := cmd.Context()
 	skipped := map[int64]bool{}
-	done := 0
+	done, total := 0, len(items)
+	fmt.Fprintln(g.out(), "Type a category or account name for each transaction. ? = list them, Enter = skip, q = quit.")
 	for {
 		var next *app.ReviewItem
-		left := 0
 		for i := range items {
 			if !skipped[items[i].Tx.ID] {
-				if next == nil {
-					next = &items[i]
-				}
-				left++
+				next = &items[i]
+				break
 			}
 		}
 		if next == nil {
 			fmt.Fprintf(g.out(), "Done: %d categorized.\n", done)
 			return false, nil
 		}
-		fmt.Fprintf(g.out(), "\n%s  %s  %s  (%s), %d left\n", next.Tx.Date, next.Tx.Payee, next.Amount, next.Account, left)
+		fmt.Fprintf(g.out(), "\n%d of %d  %s  %s  %s  on %s\n", done+len(skipped)+1, total, next.Tx.Date, next.Tx.Payee, next.Amount, next.Account)
 		if inst := app.FormatInstallment(next.Tx.Meta); inst != "" {
 			fmt.Fprintln(g.out(), "  "+inst)
 		}
-		ans, err := g.in.ask("Category (Enter = skip, q = quit)", "")
+		ans, err := g.in.ask("Category", "")
 		if err != nil {
 			return false, err
 		}
 		switch ans {
+		case "?":
+			if err := g.printChoices(cmd, a); err != nil {
+				return false, err
+			}
+			continue
 		case "":
 			skipped[next.Tx.ID] = true
 			continue
@@ -472,6 +476,53 @@ func (g *globals) reviewLoop(cmd *cobra.Command, a *app.App, items []app.ReviewI
 			return false, err
 		}
 	}
+}
+
+// printChoices lists what a review answer can be: open categories as a tree, then open
+// real accounts (an account makes the row a transfer).
+func (g *globals) printChoices(cmd *cobra.Command, a *app.App) error {
+	tree, err := a.Tree(cmd.Context())
+	if err != nil {
+		return err
+	}
+	headings := map[core.AccountType]string{core.Expenses: "expenses (spending)", core.Income: "income"}
+	for _, typ := range []core.AccountType{core.Expenses, core.Income} {
+		root, ok := tree.Root(typ)
+		if !ok {
+			continue
+		}
+		fmt.Fprintln(g.out(), "  "+headings[typ])
+		var walk func(id int64, depth int)
+		walk = func(id int64, depth int) {
+			for _, c := range tree.Children(id) {
+				if c.IsClosed() {
+					continue
+				}
+				fmt.Fprintln(g.out(), strings.Repeat("  ", depth+1)+c.Name)
+				walk(c.ID, depth+1)
+			}
+		}
+		walk(root.ID, 1)
+	}
+	fmt.Fprintln(g.out(), "  accounts (for a transfer)")
+	var walk func(id int64)
+	walk = func(id int64) {
+		for _, c := range tree.Children(id) {
+			if c.IsClosed() {
+				continue
+			}
+			if c.Currency != "" {
+				fmt.Fprintln(g.out(), "    "+c.Name)
+			}
+			walk(c.ID)
+		}
+	}
+	for _, typ := range []core.AccountType{core.Assets, core.Liabilities} {
+		if root, ok := tree.Root(typ); ok {
+			walk(root.ID)
+		}
+	}
+	return nil
 }
 
 // waitingLoop asks for the other amount of each transfer between currencies.

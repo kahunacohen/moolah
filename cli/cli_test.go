@@ -293,6 +293,8 @@ func TestImportScenario(t *testing.T) {
 		s.run("rule add ^salary$ salary")
 		s.run("import " + filepath.Join(dir, "oct-nov.csv"))
 		s.run("review")
+		s.answers = "?\n\nq\n"
+		s.run("review")
 		s.run("review set 4 restaurants")
 		s.run("review set 5 restaurnts")
 		s.run("rule list")

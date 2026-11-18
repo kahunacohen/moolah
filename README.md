@@ -261,6 +261,7 @@ moolah import ~/Downloads/visa-2026-10.xlsx --account visa
    ```sh
    moolah review          # shows each uncategorized row, and you choose a category
    ```
+   Type a category name, or an account name to make the row a transfer. Type `?` to list them, Enter to skip a row, `q` to stop.
 
 **Rules** choose a category from the payee text (a regular expression, not case-sensitive):
 

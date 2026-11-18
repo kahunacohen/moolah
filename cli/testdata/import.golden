@@ -46,6 +46,47 @@ ID  Date        Payee   Account      Amount
  3  2026-10-02  Coffee  leumi    -12.00 ILS
  4  2026-10-02  Coffee  leumi    -12.00 ILS
 
+$ moolah review    # answers: ? |  | q
+Type a category or account name for each transaction. ? = list them, Enter = skip, q = quit.
+
+1 of 2  2026-10-02  Coffee  -12.00 ILS  on leumi
+  expenses (spending)
+    education
+    fees
+    food
+      groceries
+      restaurants
+    gifts
+    health
+    household
+    housing
+      rent
+    shopping
+    subscriptions
+    taxes
+    transport
+      fuel
+      public
+    travel
+      flights
+    uncategorized
+    utilities
+  income
+    gifts
+    interest
+    invest
+      gains
+    other
+    salary
+      pension
+  accounts (for a transfer)
+    leumi
+
+1 of 2  2026-10-02  Coffee  -12.00 ILS  on leumi
+
+2 of 2  2026-10-02  Coffee  -12.00 ILS  on leumi
+Stopped: 0 categorized. Run moolah review again to continue.
+Category: Category: Category: 
 $ moolah review set 4 restaurants
 Transaction 4 → restaurants.
 
