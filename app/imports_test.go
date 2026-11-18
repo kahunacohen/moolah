@@ -182,6 +182,19 @@ func TestReviewAndReconcile(t *testing.T) {
 			t.Fatalf("got %q, %v", name, err)
 		}
 	})
+	// A rule preview lists only waiting rows the pattern matches, so nothing changes before the user agrees.
+	t.Run("rule preview", func(t *testing.T) {
+		a := newBook(t)
+		importOK(t, a, ImportParams{File: csvFile(t, "2026-10-01,AMAZON PRIME*N46RX2TU3,-15.89",
+			"2026-10-02,Coffee,-12", "2026-11-01,AMAZON PRIME*Q11AB2CD3,-15.89"), Account: "leumi"})
+		got, err := a.RuleMatches(ctx, SuggestPattern("AMAZON PRIME*N46RX2TU3"))
+		if err != nil || len(got) != 2 {
+			t.Fatalf("matches %d, %v", len(got), err)
+		}
+		if items, _ := a.Review(ctx); len(items) != 3 {
+			t.Fatalf("preview changed the book: %d waiting", len(items))
+		}
+	})
 	// A difference with the statement lists possible duplicates to check.
 	t.Run("reconcile finds duplicates", func(t *testing.T) {
 		a := newBook(t)
@@ -336,4 +349,25 @@ func TestCrossCurrencyTransfers(t *testing.T) {
 			t.Fatalf("bank %+v card %+v", bank, card)
 		}
 	})
+}
+
+func TestSuggestPattern(t *testing.T) {
+	tests := []struct {
+		name  string
+		payee string
+		want  string
+	}{
+		{"reference after star is dropped", "AMAZON PRIME*N46RX2TU3 Amzn.com/billWA", `AMAZON PRIME`},
+		{"star between words is kept", "GMF*MUSIC CENTER (AHIM", `GMF\*MUSIC`},
+		{"store number is dropped", "SHUFERSAL DEAL 1234", `SHUFERSAL DEAL`},
+		{"digits in the first word are kept", "7-ELEVEN 00123", `7-ELEVEN`},
+	}
+	for _, tt := range tests {
+		// The pattern must match next month's row from the same payee, so it keeps the name and drops codes.
+		t.Run(tt.name, func(t *testing.T) {
+			if got := SuggestPattern(tt.payee); got != tt.want {
+				t.Fatalf("got %q, want %q", got, tt.want)
+			}
+		})
+	}
 }

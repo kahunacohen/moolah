@@ -1,0 +1,32 @@
+$ moolah init --base ILS --no-backup-key
+Book "main" is ready in $TMP/data/books/main.db (base currency ILS).
+Next: add your accounts, for example:
+  moolah account add Checking --kind bank --currency ILS --opening 1000
+  moolah category list
+
+$ moolah account add leumi --kind bank --currency ILS
+Added account leumi (ILS).
+
+$ moolah import $TMP/card.csv --account leumi
+Imported $TMP/card.csv into leumi with profile generic-csv: 3 new.
+Import ID 1 (undo with: moolah import undo 1).
+3 rows have no category yet. Give them one with: moolah review
+
+$ moolah review    # answers: subscriptions | y | N |  | y | q
+Type a category or account name for each transaction. ? = list them, Enter = skip, q = quit.
+
+1 of 3  2026-10-01  AMAZON PRIME*N46RX2TU3  -15.89 ILS  on leumi
+  → subscriptions
+  A rule gives this category to every payee that contains the pattern (Enter = use the suggestion).
+  It also matches 1 more waiting for review:
+    2026-11-01  AMAZON PRIME*Q11AB2CD3  -15.89 ILS
+  Rule saved: AMAZON PRIME → subscriptions.
+
+3 of 3  2026-10-02  Coffee  -12.00 ILS  on leumi
+Stopped: 2 categorized. Run moolah review again to continue.
+Category:   Always use subscriptions for this payee (add a rule)? [y/N]:   Pattern [AMAZON PRIME]:   "N" is too short: it would match almost every payee. Type at least 3 characters, for example AMAZON PRIME.
+  Pattern [AMAZON PRIME]:   Save the rule and give them subscriptions too? [Y/n]: Category: 
+$ moolah rule list
+ID  Pattern       Category       Amount  Tags
+ 1  AMAZON PRIME  subscriptions
+

@@ -305,6 +305,22 @@ func TestImportScenario(t *testing.T) {
 		s.run("transactions leumi")
 		s.golden("import")
 	})
+	// A rule saved in review refuses a too-short pattern and shows what else it matches before saving.
+	t.Run("review rule", func(t *testing.T) {
+		s := newSession(t)
+		file := filepath.Join(filepath.Dir(s.env.DataDir), "card.csv")
+		text := "Date,Description,Amount\n2026-10-01,AMAZON PRIME*N46RX2TU3,-15.89\n2026-10-02,Coffee,-12\n2026-11-01,AMAZON PRIME*Q11AB2CD3,-15.89\n"
+		if err := os.WriteFile(file, []byte(text), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		s.run("init --base ILS --no-backup-key")
+		s.run("account add leumi --kind bank --currency ILS")
+		s.run("import " + file + " --account leumi")
+		s.answers = "subscriptions\ny\nN\n\ny\nq\n"
+		s.run("review")
+		s.run("rule list")
+		s.golden("review-rule")
+	})
 	// A card payment between two currencies: each export has one amount, so the first
 	// side waits and is completed in review (here without a rate, so nothing is guessed).
 	t.Run("transfer between currencies", func(t *testing.T) {

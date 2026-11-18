@@ -972,21 +972,40 @@ func (a *App) Categorize(ctx context.Context, p CategorizeParams) (string, error
 	return name, err
 }
 
-// SuggestPattern turns a payee into a rule pattern: its first words, escaped.
+// SuggestPattern turns a payee into a rule pattern: its first one or two words, escaped.
+// Words are separated by spaces or "*" (card exports write "SHOP*CODE"). It stops at a
+// word with a digit after the first word, because such words are usually a reference
+// that changes every time (AMAZON PRIME*N46RX2TU3, SHUFERSAL DEAL 1234).
 func SuggestPattern(payee string) string {
-	words := strings.Fields(payee)
-	var keep []string
-	digits := regexp.MustCompile(`\d{3,}`)
-	for _, w := range words {
-		if digits.MatchString(w) || len(keep) == 2 {
+	words := regexp.MustCompile(`[^\s*]+`).FindAllStringIndex(payee, -1)
+	end := 0
+	for i, w := range words {
+		if i == 2 || (i > 0 && strings.ContainsAny(payee[w[0]:w[1]], "0123456789")) {
 			break
 		}
-		keep = append(keep, w)
+		end = w[1]
 	}
-	if len(keep) == 0 {
-		keep = words
+	return regexp.QuoteMeta(payee[:end])
+}
+
+// RuleMatches lists the transactions waiting for review whose payee or note a
+// pattern matches, so a user sees what a new rule would change before saving it.
+func (a *App) RuleMatches(ctx context.Context, pattern string) ([]ReviewItem, error) {
+	re, err := importers.CompilePattern(pattern)
+	if err != nil {
+		return nil, err
 	}
-	return regexp.QuoteMeta(strings.Join(keep, " "))
+	items, err := a.Review(ctx)
+	if err != nil {
+		return nil, err
+	}
+	var out []ReviewItem
+	for _, it := range items {
+		if re.MatchString(it.Tx.Payee) || (it.Tx.Note != "" && re.MatchString(it.Tx.Note)) {
+			out = append(out, it)
+		}
+	}
+	return out, nil
 }
 
 // ReconcileParams compares the book with a statement balance.

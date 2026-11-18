@@ -460,21 +460,63 @@ func (g *globals) reviewLoop(cmd *cobra.Command, a *app.App, items []app.ReviewI
 			return false, err
 		}
 		if rule {
-			pattern, err := g.in.ask("  Pattern", app.SuggestPattern(next.Tx.Payee))
+			n, err := g.reviewRule(cmd, a, next.Tx.Payee, name)
 			if err != nil {
 				return false, err
 			}
-			_, n, err := a.AddRule(ctx, app.RuleParams{Pattern: pattern, Account: name})
-			if err != nil {
-				fmt.Fprintln(g.env.Stderr, "error: "+err.Error())
-			} else if n > 0 {
-				fmt.Fprintf(g.out(), "  The rule also categorized %d more.\n", n)
-				done += n
-			}
+			done += n
 		}
 		if items, err = a.Review(ctx); err != nil {
 			return false, err
 		}
+	}
+}
+
+// reviewRule asks for a rule pattern, shows which other waiting rows it matches, and
+// saves the rule when the user agrees. It returns how many rows the rule categorized.
+func (g *globals) reviewRule(cmd *cobra.Command, a *app.App, payee, category string) (int, error) {
+	ctx := cmd.Context()
+	fmt.Fprintln(g.out(), "  A rule gives this category to every payee that contains the pattern (Enter = use the suggestion).")
+	for {
+		pattern, err := g.in.ask("  Pattern", app.SuggestPattern(payee))
+		if err != nil {
+			return 0, err
+		}
+		if len([]rune(pattern)) < 3 {
+			fmt.Fprintf(g.env.Stderr, "  %q is too short: it would match almost every payee. Type at least 3 characters, for example %s.\n",
+				pattern, app.SuggestPattern(payee))
+			continue
+		}
+		matches, err := a.RuleMatches(ctx, pattern)
+		if err != nil {
+			fmt.Fprintln(g.env.Stderr, "  error: "+err.Error())
+			continue
+		}
+		if len(matches) > 0 {
+			fmt.Fprintf(g.out(), "  It also matches %d more waiting for review:\n", len(matches))
+			for i, m := range matches {
+				if i == 5 {
+					fmt.Fprintf(g.out(), "    … and %d more\n", len(matches)-5)
+					break
+				}
+				fmt.Fprintf(g.out(), "    %s  %s  %s\n", m.Tx.Date, m.Tx.Payee, m.Amount)
+			}
+			ok, err := g.in.confirmDefault("  Save the rule and give them "+category+" too?", true)
+			if err != nil {
+				return 0, err
+			}
+			if !ok {
+				fmt.Fprintln(g.out(), "  No rule saved.")
+				return 0, nil
+			}
+		}
+		_, n, err := a.AddRule(ctx, app.RuleParams{Pattern: pattern, Account: category})
+		if err != nil {
+			fmt.Fprintln(g.env.Stderr, "  error: "+err.Error())
+			return 0, nil
+		}
+		fmt.Fprintf(g.out(), "  Rule saved: %s → %s.\n", pattern, category)
+		return n, nil
 	}
 }
 
