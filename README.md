@@ -224,8 +224,8 @@ Unlike categories, a new tag is created when you first use it.
 **See and change transactions:**
 
 ```sh
-moolah register checking                    # transactions of one account, with running balance
-moolah register --category food --from 2026-10-01
+moolah transactions checking                # transactions of one account, with running balance
+moolah transactions --category food --from 2026-10-01
 moolah edit <transaction-id>             # opens the transaction in $EDITOR
 moolah delete <transaction-id>
 moolah history --tx <transaction-id>     # every version of the transaction
@@ -404,7 +404,7 @@ moolah report networth --from 2026-01-01 --to 2026-10-31
 moolah report income --month 2026-10            # income and spending for a month
 moolah report income --from 2026-01-01 --depth 1    # top-level categories only
 
-moolah register chase --from 2026-10-01    # list of transactions
+moolah transactions chase --from 2026-10-01    # list of transactions (also: moolah register)
 
 moolah report income --month 2026-10 --by charge-date   # card purchases by billing month
 ```
@@ -413,7 +413,7 @@ moolah report income --month 2026-10 --by charge-date   # card purchases by bill
 
 **Which exchange rate does a report use?**
 
-- **Spending and income** (`report income`, `register`): the rate on the **date of each transaction**. What you spent in October stays the same, even when exchange rates change later.
+- **Spending and income** (`report income`, `transactions`): the rate on the **date of each transaction**. What you spent in October stays the same, even when exchange rates change later.
 - **Balances and net worth** (`balance`, `report networth`): the rate on the **report date**. It answers "what is this worth now?"
 
 The net-worth report shows how the difference happened:

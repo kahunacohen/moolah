@@ -72,14 +72,14 @@ Added transaction 2 on 2026-10-02:
 $ moolah category rename restuarants eating-out
 Renamed restuarants to eating-out.
 
-$ moolah register --category eating-out
+$ moolah transactions --category eating-out
 ID  Date        Payee  Other side     Amount    Balance
  2  2026-10-02         leumi       50.00 ILS  50.00 ILS
 
 $ moolah category merge eating-out restaurants
 Merged eating-out into restaurants (1 transaction line moved).
 
-$ moolah register --category restaurants
+$ moolah transactions --category restaurants
 ID  Date        Payee  Other side     Amount    Balance
  2  2026-10-02         leumi       50.00 ILS  50.00 ILS
 

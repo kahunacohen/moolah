@@ -255,9 +255,10 @@ func balanceMap(b core.Balance) map[string]string {
 func registerCmd(g *globals) *cobra.Command {
 	var from, to, tag, category string
 	cmd := &cobra.Command{
-		Use:               "register [account]",
+		Use:               "transactions [account]",
+		Aliases:           []string{"register"},
 		Short:             "List transactions, for one account with a running balance",
-		Example:           "  moolah register checking\n  moolah register --category food --from 2026-10-01",
+		Example:           "  moolah transactions checking\n  moolah transactions --category food --from 2026-10-01",
 		Args:              cobra.MaximumNArgs(1),
 		ValidArgsFunction: g.completeAccounts(app.ScopeAny),
 		RunE: func(cmd *cobra.Command, args []string) error {

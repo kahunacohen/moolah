@@ -29,7 +29,7 @@ Added transaction 2 on 2026-11-04:
   leumi                          -100.00 ILS
   food                           100.00 ILS
 
-[laptop] $ moolah register leumi
+[laptop] $ moolah transactions leumi
 ID  Date        Payee            Other side        Amount       Balance
  1  2026-10-01  Opening balance  opening     1,000.00 ILS  1,000.00 ILS
  2  2026-11-04                   food         -100.00 ILS    900.00 ILS
@@ -60,7 +60,7 @@ The other copy is saved as a backup.
 [laptop] $ moolah sync resolve --keep desktop-0002
 Kept the copy from desktop-0002. Saved the other copy as: $TMP/data/backups/moolah-main-conflict-laptop-0001-<time>.db.age
 
-[laptop] $ moolah register leumi
+[laptop] $ moolah transactions leumi
 ID  Date        Payee            Other side        Amount       Balance
  1  2026-10-01  Opening balance  opening     1,000.00 ILS  1,000.00 ILS
  2  2026-11-04                   food         -100.00 ILS    900.00 ILS
