@@ -182,6 +182,24 @@ func TestReviewAndReconcile(t *testing.T) {
 			t.Fatalf("got %q, %v", name, err)
 		}
 	})
+	// A category can be changed later; an opening balance has no category to change.
+	t.Run("recategorize", func(t *testing.T) {
+		a := newBook(t)
+		importOK(t, a, ImportParams{File: csvFile(t, "2026-10-01,Coffee,-12"), Account: "leumi"})
+		items, _ := a.Review(ctx)
+		id := items[0].Tx.ID
+		for _, c := range []string{"restaurants", "fees"} {
+			if _, err := a.Categorize(ctx, CategorizeParams{TxID: id, Category: c}); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if got, err := a.TransactionCategory(ctx, id); err != nil || got != "fees" {
+			t.Fatalf("got %q, %v", got, err)
+		}
+		if _, err := a.Categorize(ctx, CategorizeParams{TxID: 1, Category: "fees"}); err == nil || !strings.Contains(err.Error(), "moolah edit 1") {
+			t.Fatalf("opening balance: %v", err)
+		}
+	})
 	// A rule preview lists only waiting rows the pattern matches, so nothing changes before the user agrees.
 	t.Run("rule preview", func(t *testing.T) {
 		a := newBook(t)

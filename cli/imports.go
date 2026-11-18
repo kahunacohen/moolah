@@ -50,13 +50,13 @@ func importCmd(g *globals) *cobra.Command {
 					fmt.Fprintln(g.out(), ".")
 					if res.Waiting > 0 {
 						fmt.Fprintf(g.out(), "%s to an account in another currency %s for the other account's export, which has the other amount.\n"+
-							"Import it, or give the amount with: moolah review\n", count(res.Waiting, "transfer", "transfers"), plural(res.Waiting, "waits", "wait"))
+							"Import it, or give the amount with: moolah categorize\n", count(res.Waiting, "transfer", "transfers"), plural(res.Waiting, "waits", "wait"))
 					}
 					if res.Batch != 0 {
 						fmt.Fprintf(g.out(), "Import ID %d (undo with: moolah import undo %d).\n", res.Batch, res.Batch)
 					}
 					if res.Uncategorized > 0 {
-						fmt.Fprintf(g.out(), "%s no category yet. Give them one with: moolah review\n", count(res.Uncategorized, "row has", "rows have"))
+						fmt.Fprintf(g.out(), "%s no category yet. Give them one with: moolah categorize\n", count(res.Uncategorized, "row has", "rows have"))
 					}
 				}
 				for _, e := range res.Errors {
@@ -300,13 +300,48 @@ func ruleCmd(g *globals) *cobra.Command {
 
 func reviewCmd(g *globals) *cobra.Command {
 	var listOnly bool
+	setOne := func(cmd *cobra.Command, idArg, category string) error {
+		id, err := strconv.ParseInt(idArg, 10, 64)
+		if err != nil {
+			return fmt.Errorf("invalid transaction ID %q. The ID is the first column of: moolah transactions", idArg)
+		}
+		return g.withBook(func(a *app.App) error {
+			old, err := a.TransactionCategory(cmd.Context(), id)
+			if err != nil {
+				return err
+			}
+			name, err := a.Categorize(cmd.Context(), app.CategorizeParams{TxID: id, Category: category})
+			if err != nil {
+				return err
+			}
+			if old == name {
+				fmt.Fprintf(g.out(), "Transaction %d is already in %s.\n", id, name)
+			} else {
+				fmt.Fprintf(g.out(), "Transaction %d: %s → %s.\n", id, old, name)
+			}
+			return nil
+		})
+	}
 	cmd := &cobra.Command{
-		Use:   "review",
-		Short: "Give a category to imported transactions that have none",
-		Long: "Shows each uncategorized transaction and asks for a category. You can also save your\n" +
-			"choice as a rule. Without a terminal (or with --list) it only lists them.",
-		Args: cobra.NoArgs,
+		Use:     "categorize [transaction-id category]",
+		Aliases: []string{"review"},
+		Short:   "Give transactions a category: the uncategorized ones one by one, or one by its ID",
+		Long: "Without arguments, shows each uncategorized transaction and asks for a category. You can\n" +
+			"also save your choice as a rule. Without a terminal (or with --list) it only lists them.\n\n" +
+			"With a transaction ID and a category, it sets or changes that transaction's category.\n" +
+			"The ID is the first column of: moolah transactions",
+		Example: "  moolah categorize\n  moolah categorize 5 fees          # also when transaction 5 already has a category\n" +
+			"  moolah categorize 7 checking      # an account instead of a category: a transfer",
+		Args: func(cmd *cobra.Command, args []string) error {
+			if len(args) == 1 || len(args) > 2 {
+				return errors.New("give a transaction ID and a category, for example: moolah categorize 5 fees")
+			}
+			return nil
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if len(args) == 2 {
+				return setOne(cmd, args[0], args[1])
+			}
 			return g.withBook(func(a *app.App) error {
 				items, err := a.Review(cmd.Context())
 				if err != nil {
@@ -317,7 +352,7 @@ func reviewCmd(g *globals) *cobra.Command {
 					return err
 				}
 				if len(items) == 0 && len(waiting) == 0 {
-					fmt.Fprintln(g.out(), "Nothing to review: every transaction has a category.")
+					fmt.Fprintln(g.out(), "Nothing to categorize: every transaction has a category.")
 					return nil
 				}
 				if listOnly || !g.env.Interactive {
@@ -335,31 +370,19 @@ func reviewCmd(g *globals) *cobra.Command {
 	}
 	cmd.Flags().BoolVar(&listOnly, "list", false, "only list, do not ask")
 	set := &cobra.Command{
-		Use: "set <transaction-id> <category>", Short: "Set the category of one uncategorized transaction", Args: cobra.ExactArgs(2),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			id, err := strconv.ParseInt(args[0], 10, 64)
-			if err != nil {
-				return fmt.Errorf("invalid transaction ID %q", args[0])
-			}
-			return g.withBook(func(a *app.App) error {
-				name, err := a.Categorize(cmd.Context(), app.CategorizeParams{TxID: id, Category: args[1]})
-				if err != nil {
-					return err
-				}
-				fmt.Fprintf(g.out(), "Transaction %d → %s.\n", id, name)
-				return nil
-			})
-		},
+		Use: "set <transaction-id> <category>", Short: "Same as: moolah categorize <transaction-id> <category>",
+		Args: cobra.ExactArgs(2), Hidden: true,
+		RunE: func(cmd *cobra.Command, args []string) error { return setOne(cmd, args[0], args[1]) },
 	}
 	transfer := &cobra.Command{
 		Use:     "transfer <id> <amount>",
 		Short:   "Complete a transfer between currencies with the amount on the other account",
-		Example: "  moolah review transfer 57 1200    # 1,200 arrived on the other account",
+		Example: "  moolah categorize transfer 57 1200    # 1,200 arrived on the other account",
 		Args:    cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			id, err := strconv.ParseInt(args[0], 10, 64)
 			if err != nil {
-				return fmt.Errorf("invalid ID %q; see: moolah review --list", args[0])
+				return fmt.Errorf("invalid ID %q; see: moolah categorize --list", args[0])
 			}
 			return g.withBook(func(a *app.App) error {
 				t, err := a.CompleteTransfer(cmd.Context(), app.CompleteTransferParams{ID: id, Amount: args[1]})
@@ -382,7 +405,7 @@ func (g *globals) reviewList(items []app.ReviewItem, waiting []app.WaitingTransf
 			t.add(strconv.FormatInt(it.Tx.ID, 10), it.Tx.Date.String(), it.Tx.Payee, it.Account, it.Amount.String())
 		}
 		if g.format == "table" {
-			fmt.Fprintf(g.out(), "%d transactions have no category. Set one with: moolah review set <id> <category>\n\n", len(items))
+			fmt.Fprintf(g.out(), "%d transactions have no category. Set one with: moolah categorize <id> <category>\n\n", len(items))
 		}
 		if err := g.render(t, items); err != nil {
 			return err
@@ -404,7 +427,7 @@ func (g *globals) reviewList(items []app.ReviewItem, waiting []app.WaitingTransf
 	}
 	if g.format == "table" {
 		fmt.Fprintf(g.out(), "%s between currencies %s for the other amount. Import the other account's file,\n"+
-			"or give the amount with: moolah review transfer <id> <amount>\n\n", count(len(waiting), "transfer", "transfers"), plural(len(waiting), "waits", "wait"))
+			"or give the amount with: moolah categorize transfer <id> <amount>\n\n", count(len(waiting), "transfer", "transfers"), plural(len(waiting), "waits", "wait"))
 	}
 	return g.render(t, waiting)
 }
@@ -445,7 +468,7 @@ func (g *globals) reviewLoop(cmd *cobra.Command, a *app.App, items []app.ReviewI
 			skipped[next.Tx.ID] = true
 			continue
 		case "q":
-			fmt.Fprintf(g.out(), "Stopped: %d categorized. Run moolah review again to continue.\n", done)
+			fmt.Fprintf(g.out(), "Stopped: %d categorized. Run moolah categorize again to continue.\n", done)
 			return true, nil
 		}
 		name, err := a.Categorize(ctx, app.CategorizeParams{TxID: next.Tx.ID, Version: next.Tx.Version, Category: ans})
@@ -641,7 +664,7 @@ func reconcileCmd(g *globals) *cobra.Command {
 				}
 				fmt.Fprintf(g.out(), "Different: the statement says %s, moolah says %s (difference %s).\n", res.Statement, res.Book, res.Difference)
 				if len(res.Waiting) > 0 {
-					fmt.Fprintln(g.out(), "\nImported transfers that are not recorded yet (complete them with: moolah review):")
+					fmt.Fprintln(g.out(), "\nImported transfers that are not recorded yet (complete them with: moolah categorize):")
 					for _, w := range res.Waiting {
 						fmt.Fprintf(g.out(), "  %s %s %s → %s\n", w.Date, w.Payee, w.Amount, w.Target)
 					}

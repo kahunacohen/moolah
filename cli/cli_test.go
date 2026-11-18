@@ -295,7 +295,9 @@ func TestImportScenario(t *testing.T) {
 		s.run("review")
 		s.answers = "?\n\nq\n"
 		s.run("review")
-		s.run("review set 4 restaurants")
+		s.run("categorize 4 restaurants")
+		s.run("categorize 4 fees")
+		s.run("categorize 1 fees")
 		s.run("review set 5 restaurnts")
 		s.run("rule list")
 		s.run("import list")

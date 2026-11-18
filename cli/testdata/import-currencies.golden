@@ -19,18 +19,18 @@ Added rule 2.
 $ moolah import $TMP/bank.csv --account checking
 Imported $TMP/bank.csv into checking with profile generic-csv: 0 new.
 1 transfer to an account in another currency waits for the other account's export, which has the other amount.
-Import it, or give the amount with: moolah review
+Import it, or give the amount with: moolah categorize
 Import ID 1 (undo with: moolah import undo 1).
 
 $ moolah import $TMP/card.csv --account chase
 Imported $TMP/card.csv into chase with profile generic-csv: 0 new.
 1 transfer to an account in another currency waits for the other account's export, which has the other amount.
-Import it, or give the amount with: moolah review
+Import it, or give the amount with: moolah categorize
 Import ID 2 (undo with: moolah import undo 2).
 
 $ moolah review
 2 transfers between currencies wait for the other amount. Import the other account's file,
-or give the amount with: moolah review transfer <id> <amount>
+or give the amount with: moolah categorize transfer <id> <amount>
 
 ID  Date        Payee              Account          Amount  To            Probably
  1  2026-11-02  CHASE PAYMENT      checking  -1,100.00 EUR  chase     1,200.00 USD
@@ -40,7 +40,7 @@ $ moolah review transfer 1 1200
 Recorded transaction 2.
 
 $ moolah review
-Nothing to review: every transaction has a category.
+Nothing to categorize: every transaction has a category.
 
 $ moolah register chase
 ID  Date        Payee          Other side        Amount       Balance

@@ -642,7 +642,7 @@ func (a *App) CompleteTransfer(ctx context.Context, p CompleteTransferParams) (c
 			}
 		}
 		if mine == nil {
-			return fmt.Errorf("transfer %d is not waiting. See: moolah review --list", p.ID)
+			return fmt.Errorf("transfer %d is not waiting. See: moolah categorize --list", p.ID)
 		}
 		target, _ := tree.Get(mine.Target)
 		v, err := parseAmount(p.Amount, target.Currency)
@@ -896,6 +896,39 @@ func reviewSides(tree *core.Tree, t core.Transaction, uncat int64) (own, idx int
 	return 0, 0, false
 }
 
+// TransactionCategory returns the name of a transaction's category, or "" when it
+// is not between one account and one category.
+func (a *App) TransactionCategory(ctx context.Context, id int64) (string, error) {
+	tree, err := a.st.Tree(ctx)
+	if err != nil {
+		return "", err
+	}
+	t, err := a.st.Transaction(ctx, id)
+	if err != nil {
+		return "", fmt.Errorf("there is no transaction %d. The ID is the first column of: moolah transactions", id)
+	}
+	if _, idx, ok := categorySides(tree, t); ok {
+		return tree.Name(t.Postings[idx].AccountID), nil
+	}
+	return "", nil
+}
+
+// categorySides finds, in a two-line transaction, the line on the real account and
+// the line on a category.
+func categorySides(tree *core.Tree, t core.Transaction) (own, idx int, ok bool) {
+	if len(t.Postings) != 2 {
+		return 0, 0, false
+	}
+	for i, p := range t.Postings {
+		acct, found := tree.Get(p.AccountID)
+		other, otherFound := tree.Get(t.Postings[1-i].AccountID)
+		if found && otherFound && acct.Type.IsCategory() && other.Type.IsReal() {
+			return 1 - i, i, true
+		}
+	}
+	return 0, 0, false
+}
+
 // ReviewItem is an uncategorized transaction waiting for a category.
 type ReviewItem struct {
 	Account string
@@ -928,14 +961,17 @@ func (a *App) Review(ctx context.Context) ([]ReviewItem, error) {
 	return out, nil
 }
 
-// CategorizeParams sets the category of an uncategorized transaction.
+// CategorizeParams sets the category of a transaction between a real account and a category.
 type CategorizeParams struct {
 	Category string // a category, or a real account to make it a transfer
 	TxID     int64
 	Version  int64 // the version the user saw; 0 = the current one
 }
 
-// Categorize moves a transaction from uncategorized to a category.
+// Categorize changes the category of a transaction between a real account and a
+// category (uncategorized included). A real account as the new category makes it a
+// transfer. Other transactions (transfers, opening balances, more than two lines)
+// are changed with edit, because it is not clear which line to change.
 func (a *App) Categorize(ctx context.Context, p CategorizeParams) (string, error) {
 	var name string
 	err := a.st.InTx(ctx, func(tx *store.Tx) error {
@@ -943,7 +979,6 @@ func (a *App) Categorize(ctx context.Context, p CategorizeParams) (string, error
 		if err != nil {
 			return err
 		}
-		uncat, _ := tree.Find(accountUncategorized)
 		t, err := tx.Transaction(ctx, p.TxID)
 		if err != nil {
 			return fmt.Errorf("there is no transaction %d", p.TxID)
@@ -951,9 +986,10 @@ func (a *App) Categorize(ctx context.Context, p CategorizeParams) (string, error
 		if p.Version != 0 {
 			t.Version = p.Version
 		}
-		own, idx, ok := reviewSides(tree, t, uncat.ID)
+		own, idx, ok := categorySides(tree, t)
 		if !ok {
-			return fmt.Errorf("transaction %d is not uncategorized", p.TxID)
+			return fmt.Errorf("transaction %d is not between one account and one category, so it has no single category "+
+				"to change. Change it with: moolah edit %d", p.TxID, p.TxID)
 		}
 		target, err := postable(tree, p.Category)
 		if err != nil {

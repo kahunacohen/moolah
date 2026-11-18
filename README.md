@@ -176,7 +176,7 @@ moolah category close golf --date 2026-12-31
   error: unknown account "restaurnts". Did you mean restaurants?
   ```
   To add a new category, use `moolah category add`.
-- `uncategorized` exists by default. Imported rows that no rule matches go there until you review them.
+- `uncategorized` exists by default. Imported rows that no rule matches go there until you categorize them.
 
 ## Recording transactions
 
@@ -257,11 +257,17 @@ moolah import ~/Downloads/visa-2026-10.xlsx --account visa
 2. **It detects the bank format** automatically. To choose a format yourself, use `--profile <name>`. `moolah profile list` lists the supported formats. After the first import, `--account` is optional: moolah remembers which account each format belongs to.
 3. **It skips rows you already imported.** You can import overlapping periods safely.
 4. **It applies your rules** to choose a category. Rows with no matching rule go to `uncategorized`.
-5. **You review** the result:
+5. **You categorize** the rest:
    ```sh
-   moolah review          # shows each uncategorized row, and you choose a category
+   moolah categorize      # shows each uncategorized row, and you choose a category
    ```
    Type a category name, or an account name to make the row a transfer. Type `?` to list them, Enter to skip a row, `q` to stop.
+
+   To change one transaction's category later, give its ID (the first column of `moolah transactions`):
+   ```sh
+   moolah categorize 5 fees
+   ```
+   `moolah review` is another name for `moolah categorize`.
 
 **Rules** choose a category from the payee text (a regular expression, not case-sensitive):
 
@@ -273,7 +279,7 @@ moolah rule list
 moolah rule remove 3
 ```
 
-Rules are checked in order. The first match wins. During `moolah review`, you can save your choice as a new rule. moolah suggests a pattern from the payee without codes that change every time (`AMAZON PRIME*N46RX2TU3` → `AMAZON PRIME`), and shows the other waiting rows the rule matches before it saves the rule.
+Rules are checked in order. The first match wins. During `moolah categorize`, you can save your choice as a new rule. moolah suggests a pattern from the payee without codes that change every time (`AMAZON PRIME*N46RX2TU3` → `AMAZON PRIME`), and shows the other waiting rows the rule matches before it saves the rule.
 
 **Payments between your own accounts.** A rule can point to one of your accounts instead of a category. Then the row is a transfer, not spending:
 
@@ -288,10 +294,10 @@ When the two accounts have **different currencies** (a EUR account pays a USD ca
 
 1. The first file's row **waits**. `moolah import` says so, and nothing is recorded yet.
 2. When you import the other file, moolah looks for a waiting row whose amount fits the stored exchange rate (within 5%). If exactly one fits, it records one transfer with both amounts, and the rate you really got.
-3. If none fits, or more than one, or moolah has no exchange rate, nothing is guessed: the rows keep waiting. `moolah review` shows them, with the other export's amount when there is one, and asks for the amount that arrived:
+3. If none fits, or more than one, or moolah has no exchange rate, nothing is guessed: the rows keep waiting. `moolah categorize` shows them, with the other export's amount when there is one, and asks for the amount that arrived:
    ```sh
-   moolah review --list
-   moolah review transfer 57 1200      # 1,200 USD arrived on the card
+   moolah categorize --list
+   moolah categorize transfer 57 1200      # 1,200 USD arrived on the card
    ```
    The browser's review page does the same.
 
