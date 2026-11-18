@@ -273,7 +273,7 @@ moolah rule list
 moolah rule remove 3
 ```
 
-Rules are checked in order. The first match wins. During `moolah review`, you can save your choice as a new rule.
+Rules are checked in order. The first match wins. During `moolah review`, you can save your choice as a new rule. moolah suggests a pattern from the payee without codes that change every time (`AMAZON PRIME*N46RX2TU3` → `AMAZON PRIME`), and shows the other waiting rows the rule matches before it saves the rule.
 
 **Payments between your own accounts.** A rule can point to one of your accounts instead of a category. Then the row is a transfer, not spending:
 
