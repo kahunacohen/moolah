@@ -130,7 +130,7 @@ type RegisterParams struct {
 
 // RegisterRow is one transaction in a register.
 type RegisterRow struct {
-	Amount  core.Balance // sum of the lines on the selected account(s)
+	Amount  core.Balance // sum of the lines on the selected account(s); without an account, see Register
 	Date    core.Date
 	ID      int64
 	Note    string
@@ -147,7 +147,9 @@ type RegisterReport struct {
 }
 
 // Register lists transactions, optionally for one account (with its sub-accounts)
-// and with a running balance.
+// and with a running balance. Without an account, a row's amount is seen from its
+// only real account, so money out is negative as in a one-account list; a transfer
+// between real accounts has no such side and shows its size, without a sign.
 func (a *App) Register(ctx context.Context, p RegisterParams) (RegisterReport, error) {
 	tree, err := a.st.Tree(ctx)
 	if err != nil {
@@ -189,12 +191,25 @@ func (a *App) Register(ctx context.Context, p RegisterParams) (RegisterReport, e
 		} else {
 			row.Amount = core.Balance{}
 		}
+		reals := map[int64]bool{}
+		for _, ps := range t.Postings {
+			if acct, ok := tree.Get(ps.AccountID); ok && acct.Type.IsReal() {
+				reals[ps.AccountID] = true
+			}
+		}
 		for _, ps := range t.Postings {
 			if selected[ps.AccountID] {
 				continue
 			}
 			others = append(others, tree.Name(ps.AccountID))
-			if p.Account == "" && ps.Amount.Value.Sign() > 0 {
+			if p.Account != "" {
+				continue
+			}
+			if len(reals) == 1 {
+				if reals[ps.AccountID] {
+					row.Amount.Add(ps.Amount.Currency, ps.Amount.Value)
+				}
+			} else if ps.Amount.Value.Sign() > 0 {
 				row.Amount.Add(ps.Amount.Currency, ps.Amount.Value)
 			}
 		}

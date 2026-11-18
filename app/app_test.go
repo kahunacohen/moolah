@@ -358,3 +358,37 @@ func TestBooks(t *testing.T) {
 		}
 	})
 }
+
+func TestRegisterAllAccounts(t *testing.T) {
+	// Without an account, money out is negative and a refund positive, seen from the
+	// one real account; a transfer between two real accounts has no side and shows its size.
+	t.Run("signs from the real account", func(t *testing.T) {
+		a := newBook(t)
+		mustDo(t, func() error {
+			_, err := a.AddAccount(ctx, AddAccountParams{Name: "assets:bank:savings", Currency: "ILS"})
+			return err
+		})
+		for _, amount := range []string{"-300", "50"} {
+			mustDo(t, func() error {
+				_, err := a.Add(ctx, AddParams{Account: "leumi", Amount: amount, Category: "food"})
+				return err
+			})
+		}
+		mustDo(t, func() error {
+			_, err := a.Transfer(ctx, TransferParams{From: "leumi", To: "savings", Amount: "1000"})
+			return err
+		})
+		rep, err := a.Register(ctx, RegisterParams{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		var got []string
+		for _, r := range rep.Rows {
+			got = append(got, r.Amount["ILS"].String())
+		}
+		want := []string{"25000", "-300", "50", "1000"}
+		if strings.Join(got, " ") != strings.Join(want, " ") {
+			t.Fatalf("got %v, want %v", got, want)
+		}
+	})
+}

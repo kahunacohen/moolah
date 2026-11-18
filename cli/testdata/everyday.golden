@@ -117,8 +117,8 @@ ID  Date        Payee      Other side      Amount     Balance
  5  2026-11-04             leumi        85.00 ILS  285.00 ILS
 
 $ moolah transactions --tag vacation-2026
-ID  Date        Payee                  Other side         Amount
- 4  2026-10-05  Amazon #vacation-2026  chase, hobbies  42.17 USD
+ID  Date        Payee                  Other side          Amount
+ 4  2026-10-05  Amazon #vacation-2026  chase, hobbies  -42.17 USD
 
 $ moolah tag list
 Tag            Transactions
