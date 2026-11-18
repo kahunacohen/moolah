@@ -237,7 +237,7 @@ moolah history --tx <transaction-id>     # every version of the transaction
 
 | Situation | What to enter |
 |---|---|
-| USD purchase on a US card | `moolah add chase -42.17 shopping` (USD, because the account is USD) |
+| USD purchase on a US card | `moolah add chase -42.17 household` (USD, because the account is USD) |
 | EUR purchase on a US card | the **USD amount the card charged**: `moolah add chase -41.30 travel --note "38 EUR"` |
 | Foreign purchase on a card in your own currency | the **amount the card charged**, in the card's currency. Import stores the original amount for you. |
 | Pay a USD card from a EUR account | `moolah transfer checking chase 390 --to-amount 420` (390 € left the checking account; the card got 420 $) |

@@ -77,7 +77,7 @@ A personal money manager for one user who is comfortable on the command line.
 
 | Case | Postings |
 |---|---|
-| USD purchase on a US card | `card:chase -42.17 USD` / `expenses:shopping 42.17 USD` |
+| USD purchase on a US card | `card:chase -42.17 USD` / `expenses:household 42.17 USD` |
 | EUR purchase on a US card | the USD amount charged; `orig: 38.00 EUR` as metadata |
 | Foreign purchase on an Israeli card | the ILS amount charged; original amount and currency as metadata |
 | Pay a USD card from ILS | `leumi -1530 ILS` / `card:chase +420 USD` → rate 3.643 saved as a price |

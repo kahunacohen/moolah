@@ -66,7 +66,7 @@ func TestReports(t *testing.T) {
 		a.Fetchers = []prices.Fetcher{&fakeFetcher{prices: []core.Price{usdPrice("2026-10-05", "3.70"), usdPrice("2026-10-20", "3.80"), usdPrice("2026-10-31", "3.90")}}}
 		for _, d := range []string{"2026-10-05", "2026-10-20"} {
 			mustDo(t, func() error {
-				_, err := a.Add(ctx, AddParams{Account: "card:chase", Amount: "-100", Category: "shopping", TxInfo: TxInfo{Date: core.MustDate(d)}})
+				_, err := a.Add(ctx, AddParams{Account: "card:chase", Amount: "-100", Category: "household", TxInfo: TxInfo{Date: core.MustDate(d)}})
 				return err
 			})
 		}
@@ -82,7 +82,7 @@ func TestReports(t *testing.T) {
 	t.Run("group by charge date", func(t *testing.T) {
 		a := newBook(t)
 		mustDo(t, func() error {
-			_, err := a.Add(ctx, AddParams{Account: "leumi", Amount: "-300", Category: "shopping",
+			_, err := a.Add(ctx, AddParams{Account: "leumi", Amount: "-300", Category: "household",
 				TxInfo: TxInfo{Date: core.MustDate("2026-09-20"), ChargeDate: core.MustDate("2026-10-10")}})
 			return err
 		})
@@ -105,7 +105,7 @@ func TestReports(t *testing.T) {
 		f := &fakeFetcher{prices: []core.Price{usdPrice("2026-10-01", "3.70")}}
 		a.Fetchers = []prices.Fetcher{f}
 		mustDo(t, func() error {
-			_, err := a.Add(ctx, AddParams{Account: "card:chase", Amount: "-10", Category: "shopping", TxInfo: TxInfo{Date: core.MustDate("2026-10-02")}})
+			_, err := a.Add(ctx, AddParams{Account: "card:chase", Amount: "-10", Category: "household", TxInfo: TxInfo{Date: core.MustDate("2026-10-02")}})
 			return err
 		})
 		a.Offline = true

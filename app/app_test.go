@@ -136,7 +136,7 @@ func TestTransactions(t *testing.T) {
 	// A purchase on a USD card is recorded in USD; nothing is converted at entry.
 	t.Run("foreign card purchase stays in its currency", func(t *testing.T) {
 		a := newBook(t)
-		tx, err := a.Add(ctx, AddParams{Account: "card:chase", Amount: "-42.17", Category: "shopping"})
+		tx, err := a.Add(ctx, AddParams{Account: "card:chase", Amount: "-42.17", Category: "household"})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -199,7 +199,7 @@ func TestBalances(t *testing.T) {
 	t.Run("converts at report date", func(t *testing.T) {
 		a := newBook(t)
 		mustDo(t, func() error {
-			_, err := a.Add(ctx, AddParams{Account: "card:chase", Amount: "-100", Category: "shopping", TxInfo: TxInfo{Date: core.MustDate("2026-10-05")}})
+			_, err := a.Add(ctx, AddParams{Account: "card:chase", Amount: "-100", Category: "household", TxInfo: TxInfo{Date: core.MustDate("2026-10-05")}})
 			return err
 		})
 		mustDo(t, func() error {

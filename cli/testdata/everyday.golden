@@ -18,10 +18,10 @@ Added transaction 3 on 2026-10-03 (Shufersal):
   leumi                          -200.00 ILS
   groceries                      200.00 ILS
 
-$ moolah add chase -42.17 shopping --payee Amazon --date 2026-10-05 --tag vacation-2026
+$ moolah add chase -42.17 hobbies --payee Amazon --date 2026-10-05 --tag vacation-2026
 Added transaction 4 on 2026-10-05 (Amazon):
   chase                          -42.17 USD
-  shopping                       42.17 USD
+  hobbies                        42.17 USD
 
 $ moolah add leumi -85 restaurnts
 error: unknown account "restaurnts". Did you mean restaurants?
@@ -117,8 +117,8 @@ ID  Date        Payee      Other side      Amount     Balance
  5  2026-11-04             leumi        85.00 ILS  285.00 ILS
 
 $ moolah transactions --tag vacation-2026
-ID  Date        Payee                  Other side          Amount
- 4  2026-10-05  Amazon #vacation-2026  chase, shopping  42.17 USD
+ID  Date        Payee                  Other side         Amount
+ 4  2026-10-05  Amazon #vacation-2026  chase, hobbies  42.17 USD
 
 $ moolah tag list
 Tag            Transactions
@@ -137,8 +137,8 @@ Spending
   food                        200.00
     groceries                 200.00
   health                      180.00
+  hobbies                     156.03
   household                   120.00
-  shopping                    156.03
 Total spending                656.03
 
 Net (income − spending)     6,943.97
@@ -154,8 +154,8 @@ Total income                7,600.00
 Spending
   food                        200.00
   health                      180.00
+  hobbies                     156.03
   household                   120.00
-  shopping                    156.03
 Total spending                656.03
 
 Net (income − spending)     6,943.97
@@ -225,8 +225,8 @@ Spending,
 food,200.00
 food:groceries,200.00
 health,180.00
+hobbies,156.03
 household,120.00
-shopping,156.03
 Total spending,656.03
 ,
 Net (income − spending),6943.97
@@ -241,10 +241,10 @@ expenses:food:groceries,,
 expenses:food:restaurants,,
 expenses:gifts,,
 expenses:health,,
+expenses:hobbies,,
 expenses:household,,
 expenses:housing,,
 expenses:housing:rent,,
-expenses:shopping,,
 expenses:subscriptions,,
 expenses:taxes,,
 expenses:transport,,

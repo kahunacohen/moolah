@@ -18,7 +18,7 @@ var starterAccounts = []string{
 	"expenses", "expenses:food", "expenses:food:groceries", "expenses:food:restaurants",
 	"expenses:housing", "expenses:housing:rent", "expenses:utilities",
 	"expenses:transport", "expenses:transport:fuel", "expenses:transport:public",
-	"expenses:health", "expenses:household", "expenses:shopping", "expenses:subscriptions",
+	"expenses:health", "expenses:hobbies", "expenses:household", "expenses:subscriptions",
 	"expenses:education", "expenses:travel", "expenses:travel:flights", "expenses:gifts",
 	"expenses:fees", "expenses:taxes", "expenses:uncategorized",
 	"equity", "equity:opening",
