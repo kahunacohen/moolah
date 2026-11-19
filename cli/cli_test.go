@@ -120,7 +120,7 @@ func TestScenarios(t *testing.T) {
 		s.run("account add leumi --kind bank --currency ILS --opening 25000 --date 2026-10-01")
 		s.run("account add chase --kind card --currency USD")
 		s.run("account add harel --kind pension --currency ILS --opening 380000 --date 2026-01-01")
-		s.run(`add leumi -200 food:groceries --payee Shufersal --date 2026-10-03`)
+		s.run(`add leumi -200 food:groceries --payee Shufersal --note "for the party" --date 2026-10-03`)
 		s.run(`add chase -42.17 hobbies --payee Amazon --date 2026-10-05 --tag vacation-2026`)
 		s.run("add leumi -85 restaurnts")
 		s.run("add leumi -85 food")

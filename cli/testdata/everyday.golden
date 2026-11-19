@@ -13,7 +13,7 @@ Added account chase (USD).
 $ moolah account add harel --kind pension --currency ILS --opening 380000 --date 2026-01-01
 Added account harel (ILS).
 
-$ moolah add leumi -200 food:groceries --payee Shufersal --date 2026-10-03
+$ moolah add leumi -200 food:groceries --payee Shufersal --note "for the party" --date 2026-10-03
 Added transaction 3 on 2026-10-03 (Shufersal):
   leumi                          -200.00 ILS
   groceries                      200.00 ILS
@@ -104,21 +104,21 @@ liabilities                       377.83
 Net worth                     109,027.83
 
 $ moolah transactions leumi
-ID  Date        Payee            Other side                Amount        Balance
- 1  2026-10-01  Opening balance  opening            25,000.00 ILS  25,000.00 ILS
- 3  2026-10-03  Shufersal        groceries            -200.00 ILS  24,800.00 ILS
- 6  2026-10-20  Super-Pharm      health, household    -300.00 ILS  24,500.00 ILS
- 7  2026-11-01  Transfer         chase, fees        -1,545.00 ILS  22,955.00 ILS
- 5  2026-11-04                   food                  -85.00 ILS  22,870.00 ILS
+ID  Date        Payee            Note           Other side                Amount        Balance
+ 1  2026-10-01  Opening balance                 opening            25,000.00 ILS  25,000.00 ILS
+ 3  2026-10-03  Shufersal        for the party  groceries            -200.00 ILS  24,800.00 ILS
+ 6  2026-10-20  Super-Pharm                     health, household    -300.00 ILS  24,500.00 ILS
+ 7  2026-11-01  Transfer                        chase, fees        -1,545.00 ILS  22,955.00 ILS
+ 5  2026-11-04                                  food                  -85.00 ILS  22,870.00 ILS
 
 $ moolah transactions --category food
-ID  Date        Payee      Other side      Amount     Balance
- 3  2026-10-03  Shufersal  leumi       200.00 ILS  200.00 ILS
- 5  2026-11-04             leumi        85.00 ILS  285.00 ILS
+ID  Date        Payee      Note           Other side      Amount     Balance
+ 3  2026-10-03  Shufersal  for the party  leumi       200.00 ILS  200.00 ILS
+ 5  2026-11-04                            leumi        85.00 ILS  285.00 ILS
 
 $ moolah transactions --tag vacation-2026
-ID  Date        Payee                  Other side          Amount
- 4  2026-10-05  Amazon #vacation-2026  chase, hobbies  -42.17 USD
+ID  Date        Payee                  Note  Other side          Amount
+ 4  2026-10-05  Amazon #vacation-2026        chase, hobbies  -42.17 USD
 
 $ moolah transactions eidt 3
 error: unknown command "eidt". Did you mean: moolah transactions edit?
@@ -216,12 +216,12 @@ liabilities:card:chase,-42.17,USD,-156.03
 Net worth,,,414343.97
 
 $ moolah --format csv register leumi
-ID,Date,Payee,Other side,Amount,Amount currency,Balance,Balance currency
-1,2026-10-01,Opening balance,opening,25000.00,ILS,25000.00,ILS
-3,2026-10-03,Shufersal,groceries,-200.00,ILS,24800.00,ILS
-6,2026-10-20,Super-Pharm,"health, household",-300.00,ILS,24500.00,ILS
-7,2026-11-01,Transfer,"chase, fees",-1545.00,ILS,22955.00,ILS
-5,2026-11-04,,food,-85.00,ILS,22870.00,ILS
+ID,Date,Payee,Note,Other side,Amount,Amount currency,Balance,Balance currency
+1,2026-10-01,Opening balance,,opening,25000.00,ILS,25000.00,ILS
+3,2026-10-03,Shufersal,for the party,groceries,-200.00,ILS,24800.00,ILS
+6,2026-10-20,Super-Pharm,,"health, household",-300.00,ILS,24500.00,ILS
+7,2026-11-01,Transfer,,"chase, fees",-1545.00,ILS,22955.00,ILS
+5,2026-11-04,,,food,-85.00,ILS,22870.00,ILS
 
 $ moolah --format csv report income --month 2026-10
 Category,Value (ILS)

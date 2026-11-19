@@ -43,6 +43,6 @@ $ moolah review
 Nothing to categorize: every transaction has a category.
 
 $ moolah register chase
-ID  Date        Payee          Other side        Amount       Balance
- 2  2026-11-02  CHASE PAYMENT  checking    1,200.00 USD  1,200.00 USD
+ID  Date        Payee          Note  Other side        Amount       Balance
+ 2  2026-11-02  CHASE PAYMENT        checking    1,200.00 USD  1,200.00 USD
 

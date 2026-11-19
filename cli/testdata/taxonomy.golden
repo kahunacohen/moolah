@@ -73,15 +73,15 @@ $ moolah category rename restuarants eating-out
 Renamed restuarants to eating-out.
 
 $ moolah transactions --category eating-out
-ID  Date        Payee  Other side     Amount    Balance
- 2  2026-10-02         leumi       50.00 ILS  50.00 ILS
+ID  Date        Payee  Note  Other side     Amount    Balance
+ 2  2026-10-02               leumi       50.00 ILS  50.00 ILS
 
 $ moolah category merge eating-out restaurants
 Merged eating-out into restaurants (1 transaction line moved).
 
 $ moolah transactions --category restaurants
-ID  Date        Payee  Other side     Amount    Balance
- 2  2026-10-02         leumi       50.00 ILS  50.00 ILS
+ID  Date        Payee  Note  Other side     Amount    Balance
+ 2  2026-10-02               leumi       50.00 ILS  50.00 ILS
 
 $ moolah account rename leumi checking
 Renamed leumi to checking.

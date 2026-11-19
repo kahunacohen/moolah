@@ -232,6 +232,8 @@ moolah transactions delete <transaction-id>
 moolah history --tx <transaction-id>        # every version of the transaction
 ```
 
+The list shows each transaction's payee (with its tags), note, the other side and the amount; with one account, also the running balance.
+
 Without an account, each amount is seen from the transaction's account: a purchase is negative and a refund positive. A transfer between two of your accounts shows its amount without a sign.
 
 ## Foreign currencies

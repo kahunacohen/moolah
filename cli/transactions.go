@@ -295,18 +295,18 @@ func registerCmd(g *globals) *cobra.Command {
 					}
 					return err
 				}
-				headers := []string{"ID", "Date", "Payee", "Other side", "Amount"}
+				headers := []string{"ID", "Date", "Payee", "Note", "Other side", "Amount"}
 				if rep.Account != "" {
 					headers = append(headers, "Balance")
 				}
-				t := &table{headers: headers, right: map[int]bool{0: true, 4: true, 5: true}}
+				t := &table{headers: headers, right: map[int]bool{0: true, 5: true, 6: true}}
 				js := []registerJSON{}
 				for _, r := range rep.Rows {
 					payee := r.Payee
 					for _, tg := range r.Tags {
 						payee += " #" + tg
 					}
-					cells := []string{strconv.FormatInt(r.ID, 10), r.Date.String(), payee, r.Other, r.Amount.String()}
+					cells := []string{strconv.FormatInt(r.ID, 10), r.Date.String(), payee, r.Note, r.Other, r.Amount.String()}
 					if rep.Account != "" {
 						cells = append(cells, r.Running.String())
 					}
