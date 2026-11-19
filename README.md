@@ -2,255 +2,144 @@
 
 A personal finance tool for the command line, with an optional browser UI that runs on your own computer.
 
-> **Status:** everything in this README works. Only one built-in import profile ships (`generic-csv`); for your bank, [write a profile](#adding-an-import-profile) in a few lines of TOML. Investment holdings and lots are not planned for now.
+moolah tracks bank accounts, credit cards and retirement accounts in any currency, and reports everything in **one base currency that you choose**. Your data is one SQLite file on your computer. Nothing is sent anywhere, except requests for public exchange rates.
 
-moolah keeps track of your bank accounts, credit cards and retirement accounts in any currency, and reports everything in **one base currency that you choose** (for example euros or US dollars). Your data is one SQLite file on your computer. Nothing is sent anywhere, except requests for public exchange rates.
+> **Status:** everything in this README works. Only one built-in import profile ships (`generic-csv`); for your bank, [write a profile](#import-profiles) in a few lines of TOML. Investment holdings and lots are not planned.
+
+**This README explains ideas and workflows. For the exact commands and flags, use the built-in help:** `moolah -h` lists all commands, and `moolah <command> -h` (for example `moolah account -h` or `moolah account add -h`) shows the options and examples.
 
 ## Contents
 
-**End-user guide**
-1. [Main ideas](#main-ideas)
-2. [Install](#install)
-3. [Quick start](#quick-start)
-4. [Accounts](#accounts)
-5. [Categories](#categories)
-6. [Recording transactions](#recording-transactions)
-7. [Foreign currencies](#foreign-currencies)
-8. [Importing bank and card files](#importing-bank-and-card-files)
-9. [Adding an import profile](#adding-an-import-profile)
-10. [Pension and retirement accounts](#pension-and-retirement-accounts)
-11. [Exchange rates](#exchange-rates)
-12. [Reports](#reports)
-13. [Reconciling with a statement](#reconciling-with-a-statement)
-14. [The browser UI](#the-browser-ui)
-15. [Languages and right-to-left text](#languages-and-right-to-left-text)
-16. [Backups](#backups)
-17. [History of changes](#history-of-changes)
-18. [Exporting to text](#exporting-to-text)
-19. [Working on different machines](#working-on-different-machines)
-20. [Several sets of books](#several-sets-of-books)
-21. [Common errors](#common-errors)
-
-**Operations**
-22. [Requirements and building](#requirements-and-building)
-23. [Files and locations](#files-and-locations)
-24. [Settings](#settings)
-25. [Security model](#security-model)
-26. [Network access](#network-access)
-27. [Backup and restore in detail](#backup-and-restore-in-detail)
-28. [How sync works](#how-sync-works)
-29. [Upgrades and database migrations](#upgrades-and-database-migrations)
-30. [Scheduled tasks](#scheduled-tasks)
-31. [Data integrity and direct SQL access](#data-integrity-and-direct-sql-access)
-32. [Troubleshooting](#troubleshooting)
-33. [Development](#development)
-34. [License](#license)
-
----
-
-# End-user guide
-
-## Main ideas
-
-**Accounts** are real places that hold money: bank accounts, cash, credit cards, loans, pension funds. Each account has **one currency**, the currency of its statement. A US credit card is a USD account. A checking account at a German bank is a EUR account.
-
-**Every account has a kind**, such as `bank`, `card` or `pension`. The kind groups your accounts in lists and reports, and tells moolah whether the account is something you own or money you owe. You can add your own kinds.
-
-**Categories** describe where money comes from or goes to: `food`, `rent`, `salary`. A category can be in another one (`restaurants` is in `food`). A category has no currency. It can collect spending in any currency.
-
-**Names are unique.** No two accounts have the same name, and no two spending (or income) categories do. So the name alone is always enough: `moolah add checking -85 restaurants`. moolah shows names the same way. Only when a spending and an income category share a name (`gifts`) does it show the full name, `expenses:gifts` or `income:gifts`, which you can also type.
-
-**Every transaction moves money from one place to another.** Buying groceries moves money from your bank account to the `food` category. Paying your credit card moves money from your bank account to the card. moolah records both sides, so totals always add up. (Inside, moolah uses double-entry bookkeeping. You don't need to know it to use moolah.)
-
-**Record amounts as your statement shows them.** A 42.17 $ purchase on a US card is recorded as 42.17 $. moolah never converts at entry.
-
-**Reports convert to your base currency.** Spending reports use the exchange rate of each transaction's date. Balance and net-worth reports use the rate of the report date. The difference is shown as a separate **currency effect** line, so you can see how much exchange rate changes gained or lost you.
-
-**The list of accounts and categories is closed.** You create them on purpose. A typo is an error, not a new category.
+1. [Install](#install)
+2. [Quick start](#quick-start)
+3. [Main ideas](#main-ideas)
+4. [Accounts and categories](#accounts-and-categories)
+5. [Recording transactions](#recording-transactions)
+6. [Finding and changing transactions](#finding-and-changing-transactions)
+7. [Importing bank and card files](#importing-bank-and-card-files)
+8. [Pension and retirement accounts](#pension-and-retirement-accounts)
+9. [Exchange rates](#exchange-rates)
+10. [Reports](#reports)
+11. [The browser UI](#the-browser-ui)
+12. [Languages and numbers](#languages-and-numbers)
+13. [Settings and files](#settings-and-files)
+14. [Backups](#backups)
+15. [History of changes](#history-of-changes)
+16. [Exporting to text](#exporting-to-text)
+17. [Several computers](#several-computers)
+18. [Several books](#several-books)
+19. [Security and privacy](#security-and-privacy)
+20. [Upgrades](#upgrades)
+21. [Troubleshooting](#troubleshooting)
+22. [Development](#development)
 
 ## Install
 
-Download the `moolah` binary for Linux (amd64 or arm64) from the project's GitHub **Releases** page, or build it from source (see [Requirements and building](#requirements-and-building)), and put it in your `PATH`:
+Download the `moolah` binary for Linux (amd64 or arm64) from the project's GitHub **Releases** page, or [build it](#development), and put it in your `PATH`:
 
 ```sh
 install -m 755 moolah ~/.local/bin/
-moolah --version
+moolah completion bash > ~/.local/share/bash-completion/completions/moolah   # or: completion zsh
 ```
 
-Shell completion (also completes your account and category names):
-
-```sh
-moolah completion bash > ~/.local/share/bash-completion/completions/moolah   # bash
-moolah completion zsh  > "${fpath[1]}/_moolah"                               # zsh
-```
+Shell completion also completes your account and category names.
 
 ## Quick start
 
 ```sh
-# 1. Create your data file. moolah asks for your base currency, language,
-#    encryption key and (optionally) a sync folder for other machines.
-moolah init
-
-# 2. Add your accounts: a name, a kind and a currency, and an opening balance.
+moolah init                      # asks for base currency, language, encryption key, sync folder
 moolah account add Checking --kind bank --currency EUR --opening 25000 --date 2026-11-01
 moolah account add Visa --kind card --currency EUR
-moolah account add Chase --kind card --currency USD
-
-# 3. moolah init created starter categories. Look at them, and add your own.
-moolah category list
-moolah category add coffee --in food
-
-# 4. Record a purchase.
+moolah category list             # init created starter categories
 moolah add visa -85 restaurants --payee "Corner Cafe"
-
-# 5. See your balances in your base currency.
 moolah balance
+moolah serve                     # the same book in your browser
 ```
 
-## Accounts
+## Main ideas
 
-An account has a **name**, a **kind** and a **currency**.
+- **Accounts** are real places that hold money: bank accounts, cash, cards, loans, pension funds. Each account has **one currency**, the currency of its statement.
+- **Categories** say where money comes from or goes to: `food`, `rent`, `salary`. A category can be inside another (`restaurants` in `food`). A category has no currency, so it collects spending in any currency.
+- **Every transaction moves money from one place to another.** A grocery purchase moves money from your bank account to `food`. Paying your card moves money from the bank account to the card. moolah records both sides, so totals always add up. (Inside, this is double-entry bookkeeping. You don't need to know it.)
+- **Signs are from the account's point of view:** negative means money leaves the account. A purchase on a card makes the card balance more negative; a negative card balance is money you owe.
+- **Record amounts as the statement shows them**, in the account's currency. moolah never converts when you enter data.
+- **Reports convert to your base currency.** Spending uses the rate of each transaction's date; balances use the rate of the report date. The difference is shown as a **currency effect** line.
+- **The list of accounts and categories is closed.** You create them on purpose, and a typo is an error with suggestions, not a new category:
+  ```
+  error: unknown account "restaurnts". Did you mean restaurants?
+  ```
+- **Names are unique**, so a short name is always enough (`checking`, `restaurants`). Only when a spending and an income category share a name (`gifts`) do you write the full name: `expenses:gifts` or `income:gifts`.
+
+## Accounts and categories
 
 ```sh
-moolah account add Checking --kind bank --currency EUR
 moolah account add Checking --kind bank --currency EUR --opening 25000 --date 2026-11-01
 moolah account add "Visa Gold" --kind card --currency USD
-moolah account list
-moolah account rename checking "Main checking"
-moolah account merge wallet "Pocket cash"            # moves all history, then removes wallet
-moolah account close "Old card" --date 2026-10-31
+moolah category add coffee --in food
+moolah category add bonus --in salary --income
 ```
 
-- **The name must be new.** Upper and lower case do not matter (`checking` is `Checking`). Names can have spaces; put them in quotes in the shell. A name cannot contain `:`, `#`, `=`, `;` or `|`.
-- **The currency cannot change later.** It is the currency of the account's statement. In a terminal, moolah asks for it, with your base currency as the default.
-- The **opening balance** is the balance on the day you start using moolah for this account.
-- You cannot delete an account that has transactions. Merge it into another account, or close it. A closed account keeps its history but accepts no new transactions after the close date.
+Both have `list`, `rename`, `merge` and `close` (see `moolah account -h` and `moolah category -h`).
 
-**Kinds of account.** `moolah init` creates these kinds:
+- **Names:** upper and lower case do not matter. Names can have spaces (quote them in the shell), but not `:`, `#`, `=`, `;` or `|`.
+- **An account's currency cannot change.** The **opening balance** is the balance on the day you start using moolah for the account.
+- **Nothing with transactions is deleted.** `merge` moves all history into another account or category. `close` keeps the history but refuses new transactions after the close date.
+- **Full names and moving.** moolah keeps a tree: `assets:bank:checking` is the account `checking` of kind `bank`. You see full names in exports and in CSV and JSON output. A full name in `rename` moves the item: `moolah category rename coffee drinks:coffee`.
+- **Categories:** spending in `coffee` is included in the total of `food`. You can record directly on `food` if no subcategory fits. `uncategorized` holds imported rows that no rule matched.
+
+**Kinds of account** group your accounts in lists and reports, and tell moolah whether the account is something you own (asset) or owe (liability). `init` creates:
 
 | Kind | Type | For |
 |---|---|---|
 | `bank` | asset | checking and savings accounts |
 | `cash` | asset | a wallet, cash at home |
 | `investment` | asset | brokerage accounts, funds |
-| `pension` | asset | pension funds, retirement accounts (401(k), IRA) |
+| `pension` | asset | pension funds, 401(k), IRA |
 | `card` | liability | credit cards |
 | `loan` | liability | loans, a mortgage |
 
-Add your own kind with `--asset` (something you own) or `--liability` (money you owe):
-
-```sh
-moolah account kind add crypto --asset
-moolah account kind add mortgage --liability
-moolah account kind list                     # kinds, with how many accounts each has
-moolah account kind rename crypto "digital assets"
-moolah account kind remove crypto            # only when it has no accounts
-```
-
-A kind's name is also unique: you cannot call an account `cash` while the kind `cash` exists. Call it `Wallet`, for example.
-
-**Full names.** Inside, moolah keeps accounts in a tree: `assets:bank:checking` is the account `checking` of kind `bank`, under `assets`. You see this full name in exports and in CSV and JSON output. You can also type it instead of `--kind`: `moolah account add assets:bank:checking --currency EUR`. A full name in `account rename` moves the account to another kind: `moolah account rename checking assets:investment:checking`.
-
-**Sign of balances:** a negative balance on a card or loan means you owe money. A purchase on a card makes the card balance more negative.
-
-## Categories
-
-Categories are for spending and for income.
-
-```sh
-moolah category list                       # tree of all categories
-moolah category add pets                   # spending category
-moolah category add coffee --in food       # a category in food
-moolah category add bonus --in salary --income   # income category
-moolah category rename restuarants restaurants
-moolah category merge snacks food          # moves all history from snacks to food
-moolah category close golf --date 2026-12-31
-```
-
-- **The name must be new** among the spending categories (or among the income categories). The same name can be both a spending and an income category, like `gifts` (gifts you give and gifts you get).
-- A path also works: `moolah category add food:coffee` is `coffee` in `food`. A path in `category rename` moves the category: `moolah category rename coffee drinks:coffee`.
-- A category's spending is included in the total of the category it is in. Reports can show only the top level (`--depth 1`).
-- You can record directly on a parent (`food`) if no subcategory fits.
-- A name that doesn't exist is an **error** with suggestions:
-  ```
-  error: unknown account "restaurnts". Did you mean restaurants?
-  ```
-  To add a new category, use `moolah category add`.
-- `uncategorized` exists by default. Imported rows that no rule matches go there until you categorize them.
+Add your own with `moolah account kind add crypto --asset` (or `--liability`). A kind's name is unique too: while the kind `cash` exists, call the account `Wallet`.
 
 ## Recording transactions
 
-**A purchase or a payment from one account:**
-
 ```sh
-moolah add <account> <amount> <category> [--date YYYY-MM-DD] [--payee TEXT] [--note TEXT]
-
-moolah add checking -200 food:groceries --payee "Supermarket"
-moolah add visa -85 restaurants --date 2026-11-02
-moolah add checking 18500 salary --payee "Employer Ltd"        # income: positive amount
+moolah add checking -200 groceries --payee "Supermarket" --note "for the party"
+moolah add checking 18500 salary --date 2026-11-01             # income is positive
+moolah transfer checking visa 3200                              # pay the card
+moolah add --payee "Super-Pharm" --posting checking=-300 --posting health=180 --posting household=120
 ```
 
-The date is today if you don't give one. The amount is in the account's currency, so you don't write a currency.
+- The date is today unless you give `--date`. The amount is in the account's currency.
+- A transaction with more than two lines (`--posting`) must add up to zero in each currency.
+- **Tags** group transactions across categories, for example a trip: `--tag vacation-2026`, then `moolah report income --tag vacation-2026`. Unlike categories, a tag is created when you first use it.
 
-**A transfer between two of your accounts** (including paying a credit card):
-
-```sh
-moolah transfer checking visa 3200                        # pay the Visa card from checking
-moolah transfer checking savings 5000 --date 2026-11-10
-```
-
-**A transaction with more than two lines** (for example, a split purchase):
-
-```sh
-moolah add --payee "Super-Pharm" \
-  --posting checking=-300 \
-  --posting health=180 \
-  --posting household=120
-```
-
-The lines must add up to zero in each currency, or moolah rejects the transaction.
-
-**Tags** group transactions across categories, for example everything for one trip:
-
-```sh
-moolah add visa -1840 flights --tag vacation-2026
-moolah add chase -96 restaurants --tag vacation-2026
-moolah report income --tag vacation-2026        # what did the trip cost?
-moolah tag list
-```
-
-Unlike categories, a new tag is created when you first use it.
-
-**See and change transactions:**
-
-```sh
-moolah transactions checking                # transactions of one account, with running balance
-moolah transactions --category food --from 2026-10-01
-moolah transactions                         # all accounts
-moolah transactions --search amazon         # payee or note contains "amazon" (any case)
-moolah transactions visa --search 45.90     # a line with this amount (either sign)
-moolah transactions edit <transaction-id>   # opens the transaction in $EDITOR
-moolah transactions delete <transaction-id>
-moolah history --tx <transaction-id>        # every version of the transaction
-```
-
-The list shows each transaction's payee (with its tags), note, the other side and the amount; with one account, also the running balance. A search hides rows, not money: the running balance still counts every transaction. The web register has the same search box.
-
-Without an account, each amount is seen from the transaction's account: a purchase is negative and a refund positive. A transfer between two of your accounts shows its amount without a sign.
-
-## Foreign currencies
-
-**Rule: record what the statement shows, in the account's currency.**
+**Foreign currencies:** record what the statement shows, in the account's currency.
 
 | Situation | What to enter |
 |---|---|
-| USD purchase on a US card | `moolah add chase -42.17 household` (USD, because the account is USD) |
-| EUR purchase on a US card | the **USD amount the card charged**: `moolah add chase -41.30 travel --note "38 EUR"` |
-| Foreign purchase on a card in your own currency | the **amount the card charged**, in the card's currency. Import stores the original amount for you. |
-| Pay a USD card from a EUR account | `moolah transfer checking chase 390 --to-amount 420` (390 € left the checking account; the card got 420 $) |
-| A transfer with a bank fee | `moolah transfer checking chase 390 --to-amount 420 --fee 5` (fee goes to `fees`) |
+| EUR purchase on a USD card | the **USD amount the card charged**: `moolah add chase -41.30 travel --note "38 EUR"` |
+| Pay a USD card from a EUR account | both amounts: `moolah transfer checking chase 390 --to-amount 420` (390 € left, 420 $ arrived) |
+| …with a bank fee | `moolah transfer checking chase 390 --to-amount 420 --fee 5` (the fee goes to `fees`) |
 
-When a transfer has two currencies, moolah saves the rate you actually got (here 390 ÷ 420 = 0.929 EUR per USD). Reports can compare it with the official rate, which shows how much the bank charged for the conversion.
+A transfer with two currencies keeps the rate you really got (390 ÷ 420). Reports can compare it with the official rate.
+
+## Finding and changing transactions
+
+```sh
+moolah transactions                         # all accounts
+moolah transactions checking                # one account, with running balance
+moolah transactions --category food --from 2026-10-01
+moolah transactions --search amazon         # payee or note contains "amazon" (any case)
+moolah transactions visa --search 45.90     # a line with this amount (either sign)
+moolah transactions edit 42                 # opens transaction 42 in $EDITOR
+moolah transactions delete 42
+moolah categorize 42 fees                   # change only the category
+```
+
+- The first column is the transaction ID that the other commands take.
+- With one account, the list shows a running balance. A search hides rows, not money: the balance still counts every transaction.
+- Without an account, each amount is seen from the transaction's own account: a purchase is negative, a refund positive. A transfer between your accounts shows its size without a sign.
+- `edit` shows the transaction as text: date, payee, note, tags and one line per account. You can change anything, and also split it into more lines. If what you saved has an error, moolah shows it and opens the editor again, with your changes kept. If the transaction changed elsewhere in the meantime (for example in the browser), the save is refused instead of overwriting it.
 
 ## Importing bank and card files
 
@@ -258,199 +147,108 @@ Most data should come from your bank and card exports, not from typing.
 
 ```sh
 moolah import ~/Downloads/visa-2026-10.xlsx --account visa
+moolah categorize                 # give a category to the rows no rule matched
 ```
 
-1. **moolah reads the file.** CSV, XLSX, and HTML tables saved as .xls are supported, in any language, including exports with title rows and total rows. Files that are not UTF-8 are read with the encoding the profile names (default Windows-1252).
-2. **It detects the bank format** automatically. To choose a format yourself, use `--profile <name>`. `moolah profile list` lists the supported formats. After the first import, `--account` is optional: moolah remembers which account each format belongs to.
-3. **It skips rows you already imported.** You can import overlapping periods safely.
-4. **It applies your rules** to choose a category. Rows with no matching rule go to `uncategorized`.
-5. **You categorize** the rest:
-   ```sh
-   moolah categorize      # shows each uncategorized row, and you choose a category
-   ```
-   Type a category name, or an account name to make the row a transfer. Type `?` to list them, Enter to skip a row, `q` to stop.
+1. moolah reads CSV, XLSX, and HTML tables saved as .xls, in any language, with title rows and total rows.
+2. It finds the file's format (its **profile**) from the headers, or you choose one with `--profile`. After the first import, `--account` is optional: moolah remembers the account for each profile.
+3. It skips rows already imported, so overlapping periods are safe.
+4. Your **rules** choose categories. Other rows go to `uncategorized`.
+5. `moolah categorize` shows each uncategorized row. Type a category, or an account to make the row a transfer (`?` lists names, Enter skips, `q` stops). You can save the choice as a rule. moolah suggests a pattern without the codes that change every time (`AMAZON PRIME*N46RX2TU3` → `AMAZON PRIME`), and first shows the other rows it would match.
 
-   To change one transaction's category later, give its ID (the first column of `moolah transactions`):
-   ```sh
-   moolah categorize 5 fees
-   ```
-   `moolah review` is another name for `moolah categorize`.
+A profile can also fill the **note** from a column, such as a memo or address column.
 
-**Rules** choose a category from the payee text (a regular expression, not case-sensitive):
+**Rules** match the payee and note with a regular expression (not case-sensitive). The first match wins:
 
 ```sh
-moolah rule add 'supermarket|grocer|aldi|lidl' food:groceries
-moolah rule add 'netflix|spotify' subscriptions
-moolah rule add 'shell|esso|bp ' transport:fuel --max-amount 200
-moolah rule list
-moolah rule remove 3
+moolah rule add 'supermarket|grocer|lidl' groceries
+moolah rule add 'shell|esso' fuel --max-amount 200
+moolah rule add 'visa payment' visa                  # an account: the row becomes a transfer
 ```
 
-Rules are checked in order. The first match wins. During `moolah categorize`, you can save your choice as a new rule. moolah suggests a pattern from the payee without codes that change every time (`AMAZON PRIME*N46RX2TU3` → `AMAZON PRIME`), and shows the other waiting rows the rule matches before it saves the rule.
+**Payments between your own accounts** appear in both exports, but moolah records them once: the second file's row is linked to the transfer from the first file (same accounts and amount, at most 5 days apart). A transfer you entered yourself is found the same way.
 
-**Payments between your own accounts.** A rule can point to one of your accounts instead of a category. Then the row is a transfer, not spending:
+When the two accounts have **different currencies**, each export has only one of the two amounts. The first file's row waits. When the other file is imported, moolah pairs them if exactly one waiting row fits the exchange rate (within 5%). Otherwise nothing is guessed: `moolah categorize` shows the waiting rows and asks for the amount that arrived (`moolah categorize transfer 57 1200`). The browser's review page does the same.
+
+**Undo:** `moolah import list`, then `moolah import undo 17` removes everything import 17 created.
+
+**Card details** are kept with each transaction: for a foreign purchase, the original amount and currency; for installments, "payment 3 of 12" (each monthly charge is imported as the card charged it).
+
+### Import profiles
+
+A profile is a small TOML file that describes one bank's export. No code change or rebuild is needed. Profiles are stored in the book, so backups and sync include them.
 
 ```sh
-moolah rule add 'visa payment' visa     # in the bank export
-moolah rule add 'payment thank you' checking # in the card export
+moolah profile show generic-csv > my-bank.toml   # start from a similar profile, then edit it
+moolah profile add my-bank.toml                  # checks it and saves it in the book
+moolah import test ~/Downloads/export.xls --profile my-bank --account checking   # imports nothing
+moolah profile edit my-bank                      # fix it in $EDITOR
 ```
 
-The payment appears in both exports, but moolah records it once: the row from the second file is linked to the transfer that the first file created (same accounts, same amount, at most 5 days apart).
+```toml
+name = "my-bank"
+encoding = "windows-1252"     # only for files that are not UTF-8
 
-When the two accounts have **different currencies** (a EUR account pays a USD card), each export has only one of the two amounts:
+[detect]
+headers = ["Booking date", "Description", "Debit", "Credit"]
 
-1. The first file's row **waits**. `moolah import` says so, and nothing is recorded yet.
-2. When you import the other file, moolah looks for a waiting row whose amount fits the stored exchange rate (within 5%). If exactly one fits, it records one transfer with both amounts, and the rate you really got.
-3. If none fits, or more than one, or moolah has no exchange rate, nothing is guessed: the rows keep waiting. `moolah categorize` shows them, with the other export's amount when there is one, and asks for the amount that arrived:
-   ```sh
-   moolah categorize --list
-   moolah categorize transfer 57 1200      # 1,200 USD arrived on the card
-   ```
-   The browser's review page does the same.
-
-A transfer you recorded yourself with `moolah transfer … --to-amount …` is found by both imports, so nothing is added twice.
-
-**Undo an import:**
-
-```sh
-moolah import list            # earlier imports with their IDs
-moolah import undo 17         # removes everything import 17 created
+[columns]
+date = "Booking date"
+date_format = "02.01.2006"    # Go layout: day.month.year
+payee = "Description"
+memo = "Reference"            # becomes the note
+debit = "Debit"
+credit = "Credit"
 ```
 
-If import 17 completed a waiting transfer, undoing it removes that transfer, and the row from the other file waits again.
-
-**Installments** (a purchase that the card splits into monthly payments): each monthly charge is imported as the card charged it, for example 100 € per month for a 1,200 € purchase in 12 payments. moolah keeps "payment 3 of 12" with the transaction.
-
-**Foreign purchases:** the amount charged, in the card's currency, is recorded. The original amount and currency are kept with the transaction.
-
-**Your bank's format is not supported?** Write a small TOML profile for it. No programming or rebuild is needed. See [Adding an import profile](#adding-an-import-profile).
-
-## Adding an import profile
-
-A profile is a small TOML file. No code change and no rebuild are needed. Profiles are stored in the book, so backups and sync include them.
-
-1. Start from a similar profile: `moolah profile show generic-csv > my-bank.toml`.
-2. Change the name, header names, columns and date format to match your file. Example:
-   ```toml
-   name = "my-bank"
-   encoding = "windows-1252"     # only for files that are not UTF-8
-
-   [detect]
-   headers = ["Booking date", "Description", "Debit", "Credit"]
-
-   [table]
-   stop = "Total"
-
-   [columns]
-   date = "Booking date"
-   date_format = "02.01.2006"    # day.month.year
-   payee = "Description"
-   debit = "Debit"
-   credit = "Credit"
-   ```
-3. Save it in moolah: `moolah profile add my-bank.toml`. moolah checks it and shows any error.
-4. Test it without importing anything: `moolah import test ~/Downloads/export.xls --profile my-bank --account checking`. Check that the dates, amounts and signs are correct.
-5. Fix things with `moolah profile edit my-bank` (opens your `$EDITOR` and checks the profile when you save).
-6. Import as usual. moolah finds the profile automatically from then on, and remembers which account it belongs to.
-
-Other commands: `moolah profile list`, `moolah profile export my-bank > my-bank.toml` (to share it), `moolah profile remove my-bank`.
-
-[docs/profiles.md](docs/profiles.md) lists every key, with a card example (pending rows, foreign purchases, installments). If a file cannot be described with the existing keys, the engine needs a new generic option. That is a code change in `importers/`, with a test.
+[docs/profiles.md](docs/profiles.md) lists every key, with a card example (pending rows, foreign purchases, installments).
 
 ## Pension and retirement accounts
 
-For pension funds and retirement savings plans (401(k), IRA, and similar), you usually only know the total value from the statement. moolah tracks the value and calculates the gain.
+For pension funds and retirement plans, you usually only know the total value from the statement. Record deposits as normal transactions, and enter the value when a statement arrives:
 
 ```sh
-moolah account add "Pension fund" --kind pension --currency EUR --opening 380000 --date 2026-01-01
-moolah account add 401k           --kind pension --currency USD --opening 52000  --date 2026-01-01
-
-# Deposits are normal transactions, so they are not counted as gains:
-moolah add "pension fund" 2400 salary:pension --date 2026-02-10 --payee "Employer deposit"
-
-# When a statement arrives, enter the value:
+moolah add "pension fund" 2400 salary:pension --payee "Employer deposit"
 moolah value "pension fund" 412300 --date 2026-10-31
 ```
 
-`moolah value` compares the value with the account balance and records only the difference as investment gain or loss (the income category `gains`). So:
-
-> gain for a period = change in value − deposits
-
-For a USD account like a 401(k), reports in your base currency show the market gain and the currency effect separately.
+`value` records only the difference from the balance, as gain or loss in the income category `gains`. So the gain for a period is the change in value minus deposits. For an account in another currency, reports show the market gain and the currency effect separately.
 
 ## Exchange rates
 
-moolah needs daily exchange rates to convert to your base currency. It gets them from:
+moolah needs daily rates to convert to your base currency. It downloads missing rates **automatically** when a report needs them, and stores them; after that, it works offline. Only currency codes and dates are sent.
 
-1. **Rate sources**: public rates APIs, each described in a small TOML file. moolah ships with the European Central Bank (about 30 major currencies, any pair) and the Bank of Israel (against the shekel). You can add your own, for example your country's central bank. See [docs/rate-sources.md](docs/rate-sources.md).
-2. **Rates you enter yourself.**
-3. **Rates from your own transactions** (only when no other rate exists).
+Where rates come from, in this priority:
+1. **Rate sources**: public APIs, each described in a TOML file. Built in: the European Central Bank (`ecb`, about 30 major currencies) and the Bank of Israel (`boi`, against the shekel). You can add your own: see [docs/rate-sources.md](docs/rate-sources.md). The `rate_sources` setting sets their order.
+2. **Rates you enter**: `moolah rates add 2026-10-31 USD EUR 0.92`, or `moolah rates import FILE.csv`.
+3. **Rates from your own two-currency transfers**, only when nothing else exists.
 
-For each currency in your book, moolah downloads its rate **into your base currency** from the first source that publishes it. Sources that publish against your base currency are tried first. Change the order with `moolah config set rate_sources name1,name2`. If no source publishes a pair directly, moolah downloads two rates through a shared currency and combines them.
-
-moolah downloads missing rates **automatically** when a report needs them, and stores them. After that, everything works offline. Only currency codes and dates are sent, never your data.
-
-```sh
-moolah rates fetch                              # get all missing rates now
-moolah rates fetch --in EUR                     # rates into another currency
-moolah rates list USD                           # rates stored in the book
-moolah rates add 2026-10-31 USD EUR 0.92        # enter a rate yourself
-moolah rates import my-rates.csv                # columns: date,from,to,rate
-moolah rates source list                        # where rates come from (* = used)
-moolah --offline report networth                # never use the network
-```
-
-On a weekend or holiday, moolah uses the rate of the last business day before it.
+On a weekend or holiday, moolah uses the last rate before that date. If no direct rate exists, it goes through a shared currency. A missing rate is an error, never 1:1. See `moolah rates -h`.
 
 ## Reports
 
-All reports show amounts in your base currency. Add `--in USD` (or any currency) to use a different currency for one report.
-
 ```sh
-moolah balance                                  # balance of every account, today
-moolah balance --date 2026-06-30
-moolah balance --in USD
-
-moolah report networth                          # assets − liabilities, with currency effect
-moolah report networth --from 2026-01-01 --to 2026-10-31
-
-moolah report income --month 2026-10            # income and spending for a month
-moolah report income --from 2026-01-01 --depth 1    # top-level categories only
-
-moolah transactions chase --from 2026-10-01    # list of transactions (also: moolah register)
-
-moolah report income --month 2026-10 --by charge-date   # card purchases by billing month
-```
-
-**Card purchases have two dates:** the purchase date (in the shop) and the charge date (when the card company takes the money from your bank). Reports use the **purchase date**. Use `--by charge-date` to see spending by card bill, for example to compare with "the October bill".
-
-**Which exchange rate does a report use?**
-
-- **Spending and income** (`report income`, `transactions`): the rate on the **date of each transaction**. What you spent in October stays the same, even when exchange rates change later.
-- **Balances and net worth** (`balance`, `report networth`): the rate on the **report date**. It answers "what is this worth now?"
-
-The net-worth report shows how the difference happened:
-
-```
-Net worth 2026-01-01                    412,300 €
-  + income                              231,000 €
-  − spending                           -198,400 €
-  + investment gains                     21,700 €
-  + currency effect                      -6,150 €
-Net worth 2026-10-31                    460,450 €
-```
-
-**Output formats:** `--format table` (default), `--format csv`, `--format json`. Use CSV or JSON to process the data with other tools. They always write numbers as `1234.56`, whatever your language setting. In CSV, a column of amounts becomes two columns, the number and its currency, so a spreadsheet can add them up. Account and category lists and the balance and income reports show full names (`assets:bank:leumi`), because CSV has no indentation to show the tree. Group rows (`assets:bank`) are subtotals: filter them out before you add up a column.
-
-## Reconciling with a statement
-
-Check that moolah agrees with your bank or card statement:
-
-```sh
+moolah balance                                   # every account, today
+moolah balance --date 2026-06-30 --in USD
+moolah report networth --from 2026-01-01
+moolah report income --month 2026-10 --depth 1   # top-level categories only
+moolah report income --month 2026-10 --by charge-date
 moolah reconcile visa --balance -4210.50 --date 2026-10-31
 ```
 
-If the balances are different, moolah lists the transactions near that date that may be missing or duplicated.
+- Amounts are in your base currency. `--in USD` uses another currency for one report.
+- **Which rate:** spending and income use the rate on **each transaction's date**, so October's spending does not change later. Balances and net worth use the rate on the **report date** ("what is it worth now?"). Net worth shows the difference:
+  ```
+  Net worth 2026-01-01                    412,300 €
+    + income                              231,000 €
+    − spending                           -198,400 €
+    + investment gains                     21,700 €
+    + currency effect                      -6,150 €
+  Net worth 2026-10-31                    460,450 €
+  ```
+- **Card purchases have two dates:** the purchase date and the charge date. Reports use the purchase date; `--by charge-date` groups by card bill.
+- `reconcile` compares an account with your statement. If they differ, it lists the transactions near that date that may be missing or duplicated.
+- **Output formats:** use `--format csv` or `--format json` for other tools. They always write numbers as `1234.56`. In CSV, an amount column becomes two columns (number and currency), and lists show full names (`assets:bank:leumi`). Group rows such as `assets:bank` are subtotals: filter them out before you add up a column.
 
 ## The browser UI
 
@@ -459,83 +257,96 @@ moolah serve
 moolah running at http://127.0.0.1:8473/?token=…   (Ctrl+C to stop)
 ```
 
-Your browser opens automatically. The browser UI has the same features as the command line: transactions, adding and editing, review of imports, accounts, categories and reports. History is only on the command line for now. It uses the same data, so you can use the command line and the browser at the same time.
+Your browser opens automatically. The browser UI has the transaction list (with search), adding and editing, review of imports, accounts, categories and reports. History is only on the command line. It uses the same data, so you can use the browser and the command line at the same time.
 
-- The server is only reachable from your own computer.
-- The port is 8473, or the `serve_port` setting (`moolah config set serve_port 9000`). If that port is busy, for example because another book is already served, moolah uses a free port and says which. `--port 9000` uses exactly that port, or stops with an error if it is busy. `--no-browser` doesn't open a browser.
-- The sign-in token stays the same between runs, so a bookmark (`http://127.0.0.1:8473/`) and open tabs keep working after a restart. It is in this computer's `config.toml`. `moolah serve --new-token` replaces it and signs out every browser.
-- The server stops when you press Ctrl+C or close the terminal.
+- It is only reachable from your own computer, and stops with Ctrl+C.
+- **Port:** 8473, or the `serve_port` setting. If that port is busy (for example, another book is already served), moolah uses a free port and says so. `--port` uses exactly that port, or fails.
+- **Bookmarks work.** The sign-in token stays the same between runs, so `http://127.0.0.1:8473/` and open tabs keep working after a restart. `moolah serve --new-token` replaces the token and signs out every browser.
 
-## Languages and right-to-left text
+## Languages and numbers
 
-- Payees, notes and category names can be in any language.
-- Set the language and number format: `moolah config set locale de_DE` (or `en_US`, `fr_FR`, `he_IL`, …). `moolah init` suggests the locale from your system.
-- Numbers are shown the way the language writes them: `1,234.56` in English, `1.234,56` in German. When you **type** an amount, always use a dot for decimals (`-85.50`), in every language.
-- The browser UI uses a translation file for the language if one exists (English and Hebrew are included; others fall back to English). To add one, copy `web/i18n/en.json` to `web/i18n/<language>.json` and translate it.
-- Languages written right to left (Hebrew, Arabic, Persian, Urdu, …) switch the browser UI to right-to-left.
-- Terminals display mixed right-to-left and left-to-right text badly. If table output looks wrong, use `--format csv` or the browser UI.
+- Set the language and number format with `moolah config set locale de_DE` (or `en_US`, `he_IL`, …). `init` suggests one from your system.
+- Output uses the language's separators: `1,234.56` in English, `1.234,56` in German. When you **type** an amount, always use a dot for decimals (`-85.50`).
+- Payees, notes and names can be in any language.
+- The browser UI is translated into English and Hebrew; other languages fall back to English. To add one, copy `web/i18n/en.json` to `web/i18n/<language>.json` and translate it. Right-to-left languages (Hebrew, Arabic, Persian, …) switch the page to right to left.
+- Terminals show mixed right-to-left and left-to-right text badly. If a table looks wrong, use `--format csv` or the browser UI.
+
+## Settings and files
+
+**Everything about a book is stored in the book**, so it syncs and is in every backup. Only settings that belong to one computer are in `~/.config/moolah/config.toml`. `moolah config list` shows all settings and where each is stored; `moolah config set KEY VALUE` changes one.
+
+| Setting | Stored in | Default | Meaning |
+|---|---|---|---|
+| `base_currency` | book | set by `init` | currency for all reports; changing it changes no stored data |
+| `locale` | book | from your system | language and number format |
+| `rate_sources` | book | all, those for your base currency first | exchange-rate sources to use, most trusted first, for example `ecb` |
+| `backup_recipient` | book | none (a passphrase) | age or SSH **public** key that encrypts backups and sync snapshots |
+| `backup_dir` | this computer | `~/.local/share/moolah/backups` | backup folder |
+| `offline` | this computer | `false` | `true`: never download exchange rates |
+| `serve_port` | this computer | `8473` | port of `moolah serve` (1024–65535) |
+
+`config.toml` also holds the current book, each book's sync folder and key path, and the browser sign-in token. You can edit it by hand; an unknown key is an error. `config set` rewrites the file, so your comments are not kept.
+
+| What | Location |
+|---|---|
+| Books, one file each | `~/.local/share/moolah/books/<name>.db` (plus `-wal` and `-shm` files while open) |
+| Backups | `~/.local/share/moolah/backups/` |
+| This computer's settings | `~/.config/moolah/config.toml` |
+| moolah's private encryption key | `~/.config/moolah/age-key.txt` |
+| This computer's name for sync | `~/.local/state/moolah/machine-id` |
+
+Which book a command uses: `--db PATH`, then `MOOLAH_DB`, then `--book NAME`, then `MOOLAH_BOOK`, then the current book (`moolah book use`), then `main`.
 
 ## Backups
 
 ```sh
-moolah backup                         # encrypted backup to the default backup folder
-moolah backup --to /media/usb/        # somewhere else
-moolah restore moolah-2026-11-04.db.age
+moolah backup                       # encrypted, into the backup folder
+moolah backup --to /media/usb/
+moolah restore moolah-2026-11-04T10-30.db.age          # asks before replacing the book
+moolah restore FILE --db /tmp/test.db                  # restore elsewhere, to look at it
 ```
 
-Backups are encrypted with the key you chose in `moolah init`, or with a passphrase if you chose none. **If you lose the key or the passphrase, the backup cannot be opened.** See [Backup and restore in detail](#backup-and-restore-in-detail).
+- Backups are encrypted with [age](https://age-encryption.org): with your `backup_recipient` key, or else with a passphrase. **If you lose the key or the passphrase, the backup cannot be opened.**
+- A backup is a consistent copy, also while `moolah serve` runs.
+- `restore` also accepts a plain book file (`.db`), for example a copy from another computer. moolah checks it first and refuses a damaged file or one that is not a moolah book.
+- For scripts without a key, set `MOOLAH_PASSPHRASE`. To decrypt by hand: `age -d -i ~/.ssh/id_ed25519 FILE > moolah.db`.
+- moolah does not delete old backups. Test a restore now and then.
+- For a scheduled backup, use cron and a `backup_recipient` key: `0 3 * * 0  moolah backup >/dev/null`.
 
 ## History of changes
 
-moolah keeps every change to your book: what changed, when, on which computer, and with which command. A change in the browser is kept too.
+moolah keeps every change to your book: what changed, when, on which computer, and with which command. Changes made in the browser are kept too.
 
 ```
 $ moolah history
-ID  Time              Computer     Command                    Changes
- 7  2026-11-04 12:00  laptop-1a2b  delete 2 --yes             1 transaction deleted
- 6  2026-11-04 11:58  laptop-1a2b  config set locale de_DE    1 setting changed
- 4  2026-11-04 11:52  laptop-1a2b  category rename food eat   1 category changed
+ID  Time              Computer     Command                       Changes
+ 7  2026-11-04 12:00  laptop-1a2b  transactions delete 2 --yes   1 transaction deleted
+ 6  2026-11-04 11:58  laptop-1a2b  config set locale de_DE       1 setting changed
 
-$ moolah history 7                          # exactly what action 7 changed
-Action 7  2026-11-04 12:00  on laptop-1a2b
-  delete 2 --yes
-
-  transaction 2 deleted
-    date: 2026-10-02
-    payee: Cafe
-    - leumi  -50.00 ILS
-    - eat  50.00 ILS
-
-$ moolah history --tx 2                     # every action that changed transaction 2
+$ moolah history 7                   # exactly what action 7 changed
+$ moolah history --tx 2              # every action that changed transaction 2
 ```
 
-- Each command is one action. An import is one action, and so is a change in the browser (shown as `browser: POST /tx/5`).
-- Changed fields are shown as `payee: Shufersal → Rami Levy`. Lines of a transaction that were added or removed are shown with `+` and `-`.
-- Account and category names are shown as they are **today**. After `category rename food eat`, older history shows `eat`.
-- History keeps transactions, accounts, categories, tags, settings, rules, import profiles and rate sources. Downloaded exchange rates are not kept: download them again.
-- History is in the book, so it moves with sync and is in your backups.
-- **Deleted data stays in history.** To really remove old data, delete the history before a date: `moolah history prune --before 2026-01-01`. Your data does not change. With sync, your other computers drop the same history.
-- moolah shows history; it does not undo it. To go back, look at what changed and do the opposite, or restore a backup.
+- One command, one import, or one change in the browser is one action. Changed fields show as `payee: Shufersal → Rami Levy`.
+- Account and category names are shown as they are **today**.
+- Everything you enter is kept: transactions, accounts, categories, tags, settings, rules, profiles and rate sources. Downloaded rates are not.
+- History is in the book, so it syncs and is in backups. **Deleted data stays in history**; `moolah history prune --before 2026-01-01` really removes it.
+- moolah shows history but does not undo it. Make the opposite change, or restore a backup.
 
 ## Exporting to text
 
-`moolah export` writes the whole book as text files into a new or empty folder, so your data stays readable without moolah. One command writes all the files:
-
-```sh
-moolah export ~/moolah-export
-hledger -f ~/moolah-export/moolah.journal balance      # the same balances, in hledger
-```
+`moolah export ~/moolah-export` writes the whole book as text files into a new or empty folder, so your data stays readable without moolah.
 
 | File | Contents |
 |---|---|
-| `moolah.journal` | accounts, transactions and exchange rates, in the plain-text accounting format that [hledger](https://hledger.org) and [Ledger](https://ledger-cli.org) read |
-| `transactions.csv` | the same transactions, one row per transaction line, for spreadsheets and scripts |
+| `moolah.journal` | accounts, transactions and rates for [hledger](https://hledger.org) and [Ledger](https://ledger-cli.org) |
+| `transactions.csv` | one row per transaction line, for spreadsheets and scripts |
 | `prices.csv` | all exchange rates: `date,from,to,rate,source` |
-| `rules.csv` | your import rules, in matching order: `position,pattern,account,min_amount,max_amount,tags` |
-| `settings.toml` | the book's settings (base currency, language, …) |
-| `profiles/*.toml`, `rate-sources/*.toml` | your own import profiles and rate sources; built-in ones are not exported |
+| `rules.csv` | your import rules, in matching order |
+| `settings.toml` | the book's settings |
+| `profiles/*.toml`, `rate-sources/*.toml` | your own profiles and rate sources |
 
-**The journal.** hledger and Ledger are two well-known open-source accounting programs that read plain text files. They use the same double-entry model as moolah, so nothing is lost. A transaction in the journal:
+A journal transaction:
 
 ```
 2026-11-01 (4) Transfer
@@ -544,385 +355,115 @@ hledger -f ~/moolah-export/moolah.journal balance      # the same balances, in h
     expenses:fees           15.00 ILS
 ```
 
-- `(4)` is the transaction ID in moolah. `@@` is the total cost of an amount in another currency.
-- A card charge date is a second date: `2026-10-03=2026-11-10`. A note follows the payee after ` | `.
-- Tags and details (for example the original foreign amount) are comment lines below the date: `; trip:`, `; orig: 38.00 EUR`.
-- `;` and `|` in a payee or note would break the line, so the journal writes them as `,` and `/`. The CSV keeps the text as it is.
-- Rates that moolah derived from your own transactions are only in `prices.csv`. hledger derives them itself from `@@`.
-- For Beancount, convert the journal with hledger: `hledger -f moolah.journal print -O beancount`.
+- `(4)` is the moolah ID, and `@@` is the total cost in another currency. A card charge date is a second date (`2026-10-03=2026-11-10`). A note follows the payee after ` | `. Tags and details are comment lines that start with `;`.
+- `hledger -f moolah.journal balance` shows the same balances. For Beancount: `hledger -f moolah.journal print -O beancount`.
+- In `transactions.csv`, `kind` is `normal`, `opening` or `valuation`. To total spending by category, filter `account` on `expenses:` and add up `amount` per currency.
+- **The files are not encrypted.** History is not exported, and moolah cannot read an export back (use backup and restore, or sync).
 
-**The CSV.** `transactions.csv` has one row per transaction line, with the transaction's fields repeated on each of its lines. Numbers use a dot and no thousands separator, whatever your language setting.
+## Several computers
 
-```
-transaction_id,date,charge_date,payee,note,kind,tags,meta,account,amount,currency,cost_amount,cost_currency
-4,2026-11-01,,Transfer,,normal,,,assets:bank:leumi,-1545.00,ILS,,
-4,2026-11-01,,Transfer,,normal,,,liabilities:card:chase,420.00,USD,1530.00,ILS
-4,2026-11-01,,Transfer,,normal,,,expenses:fees,15.00,ILS,,
-```
+moolah can use one book on several computers, through a folder that you already sync with Dropbox, Syncthing, Nextcloud or a similar tool. moolah puts only **encrypted snapshot files** in that folder, never the live database.
 
-`kind` is `normal`, `opening` (opening balance) or `valuation` (from `moolah value`). `tags` are separated by commas, `meta` entries by `; `. To total spending by category in a spreadsheet, filter `account` on `expenses:` and add up `amount` per currency.
+**The one rule: work on one computer at a time.** moolah does not merge changes from two computers. If both changed data, it stops and asks which copy to keep.
 
-**Good to know:**
-- **The files are not encrypted.** Keep them somewhere safe, or delete them when you are done.
-- moolah writes only into a new or empty folder, so an export never overwrites files.
-- History is not exported; it stays in the book.
-- moolah cannot read an export back. To move a book to another computer, use `moolah backup` and `moolah restore`, or sync.
+**First computer:** `moolah init` asks for a sync folder (or later: `moolah sync init ~/Dropbox/moolah`). Sync needs an encryption key: `init` creates `~/.config/moolah/age-key.txt`, or uses your SSH key. **Copy the private key to each computer** in a safe way, to the same path.
 
-## Working on different machines
+**Another computer:** install moolah, copy the key, and wait until the folder has synced. Then run `moolah init` and answer **yes** to "Do you already use moolah on another computer?" (without prompts: `moolah init --sync-dir ~/Dropbox/moolah --join`).
 
-You can use moolah on several computers, for example a desktop at home and a laptop. moolah moves your data between them automatically, through a folder that you already sync with Dropbox, Syncthing, Google Drive, Nextcloud or a similar tool.
+**Daily use** needs nothing extra. Before each command, moolah loads the newest snapshot; after each change, it writes a new one. `moolah serve` checks every 30 seconds, and saves a few seconds after a change and when it stops. `moolah sync status` shows the state, `moolah sync now` syncs at once, and `--no-sync` skips sync for one command.
 
-**The one rule: work on one computer at a time.** moolah does not merge changes made on two computers at the same time. If that happens, it stops and asks you which copy to keep. It never mixes them silently.
+**Switching computers:** stop `moolah serve` on the first one, wait a few seconds for your sync tool to upload, then continue. If you don't, you see `warning: moolah is in use on laptop since 10:32`.
 
-### What moves between machines
-
-| Moves automatically | Set up once on each machine |
-|---|---|
-| all transactions, accounts and categories | the `moolah` binary |
-| settings (base currency, language, …) | the private key that decrypts the data (`~/.config/moolah/age-key.txt`, or your SSH key) |
-| import rules and your import profiles | — |
-| exchange rates already downloaded | — |
-
-### Setting up the first machine
-
-`moolah init` asks for a sync folder after the book's own questions. Give one now, or add it later with `moolah sync init <folder>`.
-
-```
-$ moolah init
-Do you already use moolah on another computer? [y/N]:
-Base currency (ISO code, for example USD, EUR, GBP) [EUR]:
-Language and number format (for example en_US, de_DE, he_IL) [en_US]: de_DE
-Sync folder for your other computers (Enter to skip; add one later with: moolah sync init <folder>): ~/Dropbox/moolah
-Encryption key for backups and sync: 'new' (create one), 'ssh' (~/.ssh/id_ed25519.pub), a public key, or 'none' (a passphrase each time) [new]:
-Created the encryption key ~/.config/moolah/age-key.txt. Keep a copy somewhere safe; copy it to your other computers.
-This book syncs through ~/Dropbox/moolah.
-```
-
-Sync needs an encryption key. **Copy the private key file to each of your computers** in a safe way (for example with `scp`), to the same path. Without it, a computer cannot read the synced data. `moolah sync keygen` creates the key later if you skipped it.
-
-### Adding another machine
-
-Install moolah, copy the private key to this machine, and wait until the sync folder is synced. Then run `init` and answer **yes** to the first question. moolah joins the existing book, so it asks nothing else:
-
-```
-$ moolah init
-Do you already use moolah on another computer? [y/N]: y
-Its sync folder (the folder your sync tool shares, for example ~/Dropbox/moolah): ~/Dropbox/moolah
-Joined the book in the sync folder. Your data is up to date.
-```
-
-If the folder is still empty (your sync tool has not finished), moolah says so and creates nothing.
-
-Without prompts: `moolah init --sync-dir ~/Dropbox/moolah --join`.
-
-### Daily use
-
-There is nothing extra to do.
-- Before each command, moolah loads the newest data from the sync folder.
-- After each change, moolah writes the new data to the sync folder.
-- `moolah serve` checks the sync folder regularly, and saves your changes a few seconds after you make them and when you stop it.
-
-`moolah sync status` shows the state:
-```
-Folder:   /home/you/Dropbox/moolah
-Computer: desktop-91c0
-State:    up to date (snapshot 214 from laptop-3f2a, 2 minutes ago)
-```
-
-`moolah sync now` loads and uploads immediately. `--no-sync` skips sync for one command.
-
-### Switching machines
-
-1. Finish on the first machine. Stop `moolah serve` if it is running (Ctrl+C).
-2. Wait until your sync tool has uploaded the files (usually a few seconds).
-3. Continue on the other machine.
-
-If you skip step 1 or 2, you will probably see:
-```
-warning: moolah is in use on laptop since 10:32. Changes made here may conflict.
-```
-Go back and close moolah there, or wait for your sync tool.
-
-### If both machines changed data
+**If both computers changed data,** every command stops until you choose:
 
 ```
 error: conflict: laptop-3f2a and desktop-91c0 both changed data since snapshot 212.
   laptop-3f2a (this computer): 4 transactions that the other side does not have
   desktop-91c0: 38 transactions that the other side does not have
 Choose the copy to keep: moolah sync resolve --keep laptop-3f2a | --keep desktop-91c0
-The other copy is saved as a backup.
 ```
-Every command stops with this message until you choose. Nothing changes before that.
-- The copy you don't keep is saved as a backup, so nothing is deleted.
-- Then redo the changes from the other copy. **Imports are easy to repeat:** import the same file again, and moolah skips rows it already has.
-- Usually, keep the side with the most manual work, and repeat the imports.
 
-### Working offline
+The other copy is saved as a backup. Redo its changes. Imports are easy to repeat, because moolah skips rows it already has.
 
-Each machine has its full data locally, so moolah works without a network. Your changes are sent when the sync tool is online again. `moolah sync status` shows `3 changes not uploaded yet` until then. Don't switch machines while one of them still has changes that are not uploaded.
+**How it works:** each computer keeps its full database, so moolah also works offline. Each change writes a new, encrypted, write-once file (`snap-<number>-<parent>-<computer>.age`) and renames it into place when it is complete, so a sync tool never sees a half-written file. The parent number tells moolah whether a newer snapshot continues your data (load it) or both sides changed (conflict). moolah keeps the last 20 snapshots plus one per day for 30 days, and each computer deletes only its own. A computer refuses snapshots of another book. The sync folder and key are set per computer, in `config.toml`. `moolah sync off` stops sync on one computer and keeps its data.
 
-### Moving to a new computer without sync
+## Several books
+
+A **book** is a separate set of finances, for example for a parent whose money you manage. Books share nothing: each has its own accounts, settings, rules, sync folder and backups. With one book, you can ignore this: the book is called `main`.
 
 ```sh
-old$ moolah backup --to /media/usb/
-new$ moolah restore /media/usb/moolah-2026-11-04T10-30.db.age
+moolah book add mom              # asks the same questions as init
+moolah book use mom              # every command now uses mom
+moolah --book main balance       # one command on another book
+MOOLAH_BOOK=mom moolah serve     # this terminal only
 ```
 
-### Removing a machine or turning sync off
+With more than one book, reports and the browser UI show the book name.
 
-- `moolah sync off` stops sync on this machine. Its local data stays.
-- To stop using an old machine, run `moolah sync off` there, or just stop using it. Its old snapshots are deleted automatically over time.
+## Security and privacy
 
-**Do not put the live database file itself in a sync folder.** moolah's sync puts only encrypted snapshot files there, which is safe. More details: [How sync works](#how-sync-works).
+- **The database file is not encrypted.** Protect it with full-disk encryption. moolah creates it readable only by your user (`0600`).
+- **Backups and sync snapshots are always encrypted.** Exports are not.
+- **Never put the live database in a cloud-sync folder.** Sync tools can damage an open SQLite file. Use moolah's sync instead.
+- **The browser UI** listens only on `127.0.0.1`. It is protected from other websites and local programs by a sign-in token (kept in `config.toml`, sent once in the URL, then kept in an HttpOnly cookie), a `Host` check (against DNS rebinding), and an `Origin` check with a CSRF token on every change.
+- **Network:** moolah connects only to download exchange rates, only to the hosts of the rate sources you use (`ecb`: `api.frankfurter.dev`, `boi`: `edge.boi.gov.il`), and sends only currency codes and dates. There is no telemetry and no update check. `moolah config set offline true` or `--offline` turns the network off completely.
+- moolah never asks for bank passwords.
+- **Deleting a transaction does not remove it from the file:** history keeps it until `moolah history prune`.
 
-## Several sets of books
+## Upgrades
 
-A **book** is one complete, separate set of finances. Use a separate book when you manage money for someone else, for example a parent. Books share nothing: each one has its own accounts, settings, base currency, rules, sync folder and backups.
-
-If you have only one book, you can ignore this section. Your first book is called `main`, and moolah uses it automatically.
-
-```sh
-moolah book add mom                      # create a new book (asks the same questions as init)
-moolah book list                         # * main, mom   (* = current book)
-moolah book use mom                      # switch: every command now uses mom
-moolah balance                           # mom's balances
-moolah book use main                     # switch back
-```
-
-moolah remembers the current book, so you don't need to name it in every command. For a single command on another book, use `--book`:
-
-```sh
-moolah --book mom balance                # one command on mom; the current book does not change
-MOOLAH_BOOK=mom moolah serve             # this terminal only
-```
-
-When you have more than one book, reports and the browser UI show the book name at the top.
-
-## Common errors
-
-| Message | Meaning and fix |
-|---|---|
-| `unknown account "X". Did you mean …?` | The name doesn't exist. Use the suggestion, or create it with `account add` / `category add`. |
-| `"gifts" is ambiguous: expenses:gifts, income:gifts` | A spending category and an income category have this name. Write the full name, as shown. |
-| `transaction does not balance: USD +12.00` | The lines don't add up to zero in that currency. Check the amounts. |
-| `no USD→EUR rate on or before 2026-09-14` | No rate is stored and moolah couldn't download one. Connect to the network and run `moolah rates fetch`, or add the rate with `moolah rates add`. |
-| `account old-card is closed since 2026-10-31` | The transaction date is after the close date. |
-| `conflict: laptop and desktop both changed data` | See [Working on different machines](#working-on-different-machines). Choose a copy with `moolah sync resolve`. |
-| `changed elsewhere, reload` (browser) | The transaction was changed in another tab or by a CLI command after you opened it. Reload the page and edit again. |
-| `… is not empty. Export into a new folder` | `moolah export` writes only into a new or empty folder. Give another folder name. |
-| `… is a database, but not a moolah book` | `moolah restore` was given another program's SQLite file. Check the file name. |
-| `no import profile matches this file` | Your bank's format is not supported yet. See [Adding an import profile](#adding-an-import-profile). |
-
----
-
-# Operations
-
-## Requirements and building
-
-- Linux (x86-64 or arm64). Other systems may work but are not tested.
-- To build: Go (version in `go.mod`) and `make`. No C compiler is needed (no CGO).
-
-```sh
-git clone <repo> && cd moolah
-make build        # → ./bin/moolah, one static binary
-make check        # format check, go vet, staticcheck, all tests
-make install      # copies the binary to ~/.local/bin
-```
-
-The browser UI files are embedded in the binary. There is no Node.js or frontend build step.
-
-## Files and locations
-
-| What | Default location | Change it with |
-|---|---|---|
-| Books (one file per book, with all its data and settings) | `~/.local/share/moolah/books/<name>.db` | `--book NAME` / `MOOLAH_BOOK`, or `--db PATH` / `MOOLAH_DB` for any file |
-| SQLite side files while running | `moolah.db-wal`, `moolah.db-shm` next to the DB | — |
-| Backups | `~/.local/share/moolah/backups/` | `moolah config set backup_dir DIR`, or `moolah backup --to DIR` |
-| This computer's settings | `~/.config/moolah/config.toml` | `moolah config set`, or edit by hand |
-| moolah's own encryption key (private) | `~/.config/moolah/age-key.txt` | `sync init --identity FILE` to use another key |
-| This computer's name for sync | `~/.local/state/moolah/machine-id` | — |
-
-Which database a command uses: `--db PATH`, then `MOOLAH_DB`, then `--book NAME`, then `MOOLAH_BOOK`, then the current book (`moolah book use`), then `main`.
-
-## Settings
-
-There is one rule: **everything about a book is stored in the book**, so it moves to your other computers through sync and is in every backup. Only settings that make sense on just one computer (paths, offline mode) are stored on the computer, in `~/.config/moolah/config.toml`.
-
-One command handles both. moolah knows where each setting belongs:
-
-```sh
-moolah config list
-moolah config get base_currency
-moolah config set base_currency EUR      # in the book (syncs)
-moolah config set offline true           # on this computer only
-```
-
-```
-Setting           Value   Stored in
-backup_dir                this computer
-backup_recipient  age1…   book
-base_currency     EUR     book
-locale            de_DE   book
-offline           false   this computer
-rate_sources              book
-serve_port        8473    this computer
-```
-
-| Setting | Stored in | Default | Meaning |
-|---|---|---|---|
-| `base_currency` | book | set by `init` | currency for all reports |
-| `locale` | book | from your system | language and number format, for example `en_US`, `de_DE`, `he_IL` |
-| `rate_sources` | book | automatic | exchange-rate sources to use, most trusted first, for example `ecb`. Empty: all sources, those for your base currency first |
-| `backup_recipient` | book | none | age or SSH **public** key that encrypts backups and sync snapshots; none means a passphrase is used |
-| `backup_dir` | this computer | `~/.local/share/moolah/backups` | backup folder |
-| `offline` | this computer | `false` | `true`: never download exchange rates |
-| `serve_port` | this computer | `8473` | port of `moolah serve` (1024–65535) |
-
-Changing `base_currency` changes no stored data. Only reports change.
-
-**This computer's file** (`~/.config/moolah/config.toml`) also holds the current book and each book's sync folder and key path. You can edit it by hand. moolah checks it at start, and an unknown key is an error that names the file and the key. `moolah config set` rewrites the file, so comments you add are not kept:
-
-```toml
-backup_dir = "/home/you/backups/moolah"
-current_book = "main"
-offline = false
-
-[books.3f2a9c…]                      # a book's ID
-sync_dir = "/home/you/Dropbox/moolah"
-identity = "/home/you/.config/moolah/age-key.txt"
-```
-
-Your import profiles, rate sources, rules and categories are **book** data: they are stored in the book's database. A `.toml` file you give to `moolah profile add` or `moolah rates source add` is only read once, to import it. `moolah profile show` and `moolah rates source show` print it again from the book.
-
-## Security model
-
-- **Your data is not encrypted inside the database file.** Protect it with **full-disk encryption** (for example LUKS). moolah creates the database with permissions `0600` (only your user can read it).
-- **Backups are always encrypted** with [age](https://age-encryption.org).
-- **Do not put the live database in a cloud-sync folder** (Dropbox, Google Drive, and so on). Sync tools can damage an open SQLite file, and the file is not encrypted. Use moolah's own sync (`moolah sync init`), which puts only encrypted snapshots in the folder.
-- **The browser UI** listens only on `127.0.0.1`. It is protected against other websites and local programs by a random session token, a `Host` header check (against DNS rebinding) and an `Origin` check with CSRF tokens on every change.
-- moolah never asks for or stores bank passwords.
-- **Exports are not encrypted.** `moolah export` writes plain text files (readable only by your user). Delete them when you no longer need them.
-- **Deleting a transaction does not remove it from the file**: the [history](#history-of-changes) keeps it. Use `moolah history prune` to remove old history.
-- An encrypted database file may be added in a later version.
-
-## Network access
-
-moolah connects to the network only to download exchange rates, when a report needs a missing rate or when you run `moolah rates fetch`. It connects only to the addresses in the rate sources you use (`moolah rates source list`, `moolah rates source show <name>`), and it sends only currency codes and date ranges.
-
-Built-in sources:
-
-| Source | Host |
-|---|---|
-| `ecb` | `api.frankfurter.dev` |
-| `boi` | `edge.boi.gov.il` |
-
-`moolah config set offline true` or `--offline` turns this off completely. Nothing else is sent: no telemetry, no update checks.
-
-## Backup and restore in detail
-
-`moolah backup` makes a consistent copy of the open database (SQLite `VACUUM INTO`), then encrypts it with age. It is safe to run while `moolah serve` is running.
-
-```sh
-moolah backup                                   # → backups/moolah-2026-11-04T10-30.db.age
-moolah config set backup_recipient "$(cat ~/.ssh/id_ed25519.pub)"   # use an SSH key, no passphrase
-moolah restore backups/moolah-2026-11-04T10-30.db.age               # asks before replacing the current DB
-moolah restore FILE --db /tmp/test.db           # restore to another file, to look at it
-moolah restore --book old ~/old-computer/main.db   # a plain copy of a book file also works
-```
-
-- `restore` accepts an encrypted backup or a plain book file (`.db`), for example a copy from another computer or the copy made before an upgrade. A plain file is read, not changed; changes still in its `-wal` file are included. moolah checks the copy first and refuses a damaged file or a database that is not a moolah book.
-
-- Without `backup_recipient`, every backup asks for a passphrase. For scripts, set the `MOOLAH_PASSPHRASE` environment variable instead.
-- You can also decrypt a backup by hand with the `age` tool: `age -d -i ~/.ssh/id_ed25519 FILE > moolah.db`.
-- **Test a restore** now and then, to a temporary file.
-- moolah does not delete old backups. Remove them yourself, or with a scheduled task.
-
-## How sync works
-
-- Each computer keeps its own local database. The sync folder contains only encrypted, write-once files:
-  ```
-  ~/Dropbox/moolah/
-    snap-0000000214-0000000213-laptop-3f2a.age    # snapshot 214, based on 213, from laptop
-    snap-0000000213-0000000212-desktop-91c0.age
-    lock-laptop-3f2a.json                         # "in use on laptop", with a heartbeat
-  ```
-- Every snapshot records which snapshot it was based on (the second number). This is how moolah knows whether a newer snapshot continues your local data (load it) or both sides changed (conflict).
-- A new file is written for every change and renamed into place only when complete, so a sync tool never sees a half-written or shared file.
-- moolah keeps the last 20 snapshots and one per day for 30 days, and deletes older ones. Each computer deletes only its own files.
-- Each book has a hidden ID. A computer refuses to load a snapshot of a different book.
-- The computer's name comes from `~/.local/state/moolah/machine-id`. It is not inside the synced data.
-- Every computer needs the private key that matches `backup_recipient`, to decrypt snapshots.
-- `--no-sync` skips sync for one command. `moolah sync off` stops sync on this computer.
-- The sync folder and key path are set **per computer** (they can differ between computers), in `~/.config/moolah/config.toml` under `[books.<book-id>]`. They are not book settings.
-- The decryption key is `~/.config/moolah/age-key.txt` if it exists, else `~/.ssh/id_ed25519`. Use `sync init --identity <file>` for another key.
-- `moolah serve` checks the sync folder every 30 seconds.
-
-## Upgrades and database migrations
-
-- Replace the binary. On the first run, moolah updates the book's schema automatically if needed, in one transaction: if anything fails, the book stays as it was.
-- **Before the upgrade, moolah copies the book** to the backup folder (`pre-migrate-v1-to-v2-<time>.db.age`). The copy is encrypted with `backup_recipient`. A book without a backup key gets a **plain** copy (`.db`), because moolah cannot ask for a passphrase while opening a book; delete it when the new version works. To go back, install the older moolah and `moolah restore` the copy.
-- An older binary refuses to open a book from a newer version, with a clear error.
-- **With sync, upgrade all your computers.** After one computer upgrades, its next change uploads data in the new format. A computer with the older moolah then stops with "Upgrade moolah on this computer" and does not change its local data.
-- `moolah --version` shows the binary version.
-
-## Scheduled tasks
-
-None are required. Optional examples:
-
-```sh
-# crontab -e
-0 9 * * *  moolah rates fetch >/dev/null            # rates every morning
-0 3 * * 0  moolah backup >/dev/null                 # backup every Sunday (needs backup_recipient)
-```
-
-A systemd user timer works the same way. A scheduled backup needs `backup_recipient` (or `MOOLAH_PASSPHRASE`), because it cannot ask for a passphrase. Errors still go to stderr, so cron mails them to you.
-
-## Data integrity and direct SQL access
-
-```sh
-moolah check
-```
-
-checks that every transaction balances, every account reference is valid, there are no postings after an account's close date, and SQLite's own integrity check passes.
-
-The database is a normal SQLite file, so you can query it directly:
-
-```sh
-sqlite3 -readonly ~/.local/share/moolah/books/main.db
-```
-
-Use read-only mode. Changing data with SQL skips moolah's rules. Make a backup first if you must. History still keeps a change made with SQL, but without a time or command; `moolah history` says how many such changes there are.
+- Replace the binary. On the first run, moolah updates the book's schema automatically, in one transaction: if anything fails, the book stays as it was.
+- **Before upgrading a book, moolah copies it** to the backup folder (`pre-migrate-v1-to-v2-<time>.db.age`, encrypted with `backup_recipient`). Without a key, the copy is a **plain** `.db` file; delete it when the new version works. To go back, install the older moolah and restore the copy.
+- An older moolah refuses to open a newer book. **With sync, upgrade every computer:** a computer with an older moolah stops with "Upgrade moolah on this computer" and changes nothing.
 
 ## Troubleshooting
 
-| Problem | Fix |
+| Message or problem | Fix |
 |---|---|
-| `database is locked` | Another long write is running (for example a big import). Wait and try again. If no moolah process is running, check for a stuck process with `pgrep moolah`. |
-| Browser shows "invalid token" | Open the URL that `moolah serve` printed, including `?token=`. |
-| Rates fail to download | Check the network. Test one source with `moolah rates source test <name> USD EUR`: it shows the rates, or the error. A rates API sometimes changes; fix the source with `moolah rates source edit <name>`, or enter rates with `moolah rates add`. |
-| Right-to-left text (Hebrew, Arabic) looks reversed in the terminal | A terminal limitation. Use `--format csv` or the browser UI. |
-| An import gave wrong amounts or dates | `moolah import undo <id>`, then report the problem with a sample file (personal details removed). |
+| `unknown account "X". Did you mean …?` | Use the suggestion, or create the name with `account add` or `category add`. |
+| `"gifts" is ambiguous: expenses:gifts, income:gifts` | Write the full name, as shown. |
+| `transaction does not balance: USD +12.00` | The lines don't add up to zero in that currency. |
+| `no USD→EUR rate on or before 2026-09-14` | Connect to the network and run `moolah rates fetch`, or add the rate with `moolah rates add`. |
+| `account old-card is closed since 2026-10-31` | The date is after the account's close date. |
+| `no import profile matches this file` | [Write a profile](#import-profiles) for your bank. |
+| An import gave wrong amounts or dates | `moolah import undo <id>`, fix the profile, and check it with `moolah import test` before you import again. |
+| `conflict: … both changed data` | See [Several computers](#several-computers). Choose a copy with `moolah sync resolve`. |
+| `changed elsewhere, reload` | The transaction changed after you opened it. Reload the page and edit again. |
+| Browser: `not signed in` or `wrong token` | Open the address that `moolah serve` printed, with `?token=`. |
+| Rates fail to download | `moolah rates source test <name> USD EUR` shows the error. Fix the source with `moolah rates source edit`, or enter rates yourself. |
+| `database is locked` | Another long write (for example a big import) is running. Wait and try again. |
+| Hebrew or Arabic looks reversed in the terminal | A terminal limitation. Use `--format csv` or the browser UI. |
+| Is the book consistent? | `moolah check` checks balances, references, close dates and SQLite's integrity. |
+
+You can read the database with `sqlite3 -readonly ~/.local/share/moolah/books/main.db`. Do not change it with SQL: that skips moolah's rules. (History still records such a change, but without a command.)
 
 ## Development
 
-The code is written mostly with Claude Code. The rules for the code are in `CLAUDE.md`. In short:
+moolah runs on Linux (x86-64 or arm64); other systems are not tested. Building needs Go (the version in `go.mod`) and `make`, but no C compiler. The browser UI is embedded in the binary, so there is no frontend build.
 
-```
-cmd/moolah/   main
-core/         domain logic: accounts, transactions, balance rule, valuation, reports. No I/O.
-store/        SQLite storage. The only package with SQL.
-prices/       exchange-rate downloaders
-importers/    file readers, bank profiles, duplicate detection, rules
-app/          use cases. The CLI and the web UI call only this layer.
-cli/          command-line interface (cobra)
-web/          browser UI (Go templates + htmx), embedded in the binary
+```sh
+make build        # → ./bin/moolah
+make check        # gofmt, go vet, staticcheck, all tests; must pass before every commit
+make golden       # update golden-file test output after an intended change; review the diff
+make install      # copies the binary to ~/.local/bin
 ```
 
-- `make check` must pass before every commit.
-- Core rules have unit tests. Report output and import profiles have golden-file tests: `make golden` updates them after an intended change. Look at the diff before you commit.
+The code is written mostly with Claude Code. `CLAUDE.md` has the rules (layers, invariants, conventions), and `docs/design.md` has the design.
 
-**To add a built-in import profile** (shipped in the binary): put the TOML in `importers/profiles/` with an anonymized sample file and a test. Remove personal details (names, account numbers, ID numbers) but keep the structure, headers and number formats exactly. Never commit a real bank export.
+```
+cmd/moolah  main
+cli         command line (cobra)
+web         browser UI (Go templates + htmx)
+app         use cases; the CLI and the web UI call only this layer
+importers   file formats, profiles, rules
+prices      exchange-rate sources
+syncdir     the sync folder's files
+crypt       age encryption
+store       SQLite; the only package with SQL
+core        domain rules; no I/O
+```
 
+**A built-in import profile** goes in `importers/profiles/`, with an anonymized sample file and a test. Keep the structure, headers and number formats exactly, but remove names, account numbers and ID numbers. Never commit a real bank export.
 
 ## License
 

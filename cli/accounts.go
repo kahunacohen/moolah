@@ -277,14 +277,14 @@ func categoryCmd(g *globals) *cobra.Command {
 
 // changeCmds builds rename, merge and close for accounts or categories.
 func changeCmds(g *globals, scope app.Scope) []*cobra.Command {
-	noun := "account"
+	noun := "an account"
 	if scope == app.ScopeCategory {
-		noun = "category"
+		noun = "a category"
 	}
 	complete := g.completeAccounts(scope)
 
 	rename := &cobra.Command{
-		Use: "rename <old> <new>", Short: "Rename a " + noun + " (history follows); a path such as food:snacks also moves it", Args: cobra.ExactArgs(2),
+		Use: "rename <old> <new>", Short: "Rename " + noun + " (history follows); a path such as food:snacks also moves it", Args: cobra.ExactArgs(2),
 		ValidArgsFunction: complete,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return g.withBook(func(a *app.App) error {
@@ -299,7 +299,7 @@ func changeCmds(g *globals, scope app.Scope) []*cobra.Command {
 	}
 
 	merge := &cobra.Command{
-		Use: "merge <from> <into>", Short: "Move all transactions of a " + noun + " into another, then remove it", Args: cobra.ExactArgs(2),
+		Use: "merge <from> <into>", Short: "Move all transactions of " + noun + " into another, then remove it", Args: cobra.ExactArgs(2),
 		ValidArgsFunction: complete,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return g.withBook(func(a *app.App) error {
@@ -319,7 +319,7 @@ func changeCmds(g *globals, scope app.Scope) []*cobra.Command {
 
 	var date string
 	closeC := &cobra.Command{
-		Use: "close <name>", Short: "Close a " + noun + ": history stays, no new transactions after the date", Args: cobra.ExactArgs(1),
+		Use: "close <name>", Short: "Close " + noun + ": history stays, no new transactions after the date", Args: cobra.ExactArgs(1),
 		ValidArgsFunction: complete,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			d, err := parseDateFlag(date)
