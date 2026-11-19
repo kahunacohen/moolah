@@ -2,6 +2,8 @@ package app
 
 import (
 	"bytes"
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"os"
@@ -19,6 +21,38 @@ type ComputerConfig struct {
 	Books       map[string]BookSync `toml:"books,omitempty"`        // sync setup, by book ID
 	CurrentBook string              `toml:"current_book,omitempty"` // set with "moolah book use"
 	Offline     bool                `toml:"offline,omitempty"`      // never download exchange rates
+	ServePort   int                 `toml:"serve_port,omitempty"`   // port of "moolah serve"; DefaultServePort when 0
+	ServeToken  string              `toml:"serve_token,omitempty"`  // signs the browser in to "moolah serve"; created on first use
+}
+
+// DefaultServePort is the port "moolah serve" tries when serve_port is not set.
+// It is uncommon on purpose: 8080 and 3000 are usually taken by development servers.
+const DefaultServePort = 8473
+
+// Port returns the port "moolah serve" should try first.
+func (c ComputerConfig) Port() int {
+	if c.ServePort == 0 {
+		return DefaultServePort
+	}
+	return c.ServePort
+}
+
+// ServeToken returns this computer's browser sign-in token, creating it on first
+// use. With renew, it replaces the token, which signs out every browser.
+func (p Paths) ServeToken(renew bool) (string, error) {
+	var token string
+	err := p.UpdateConfig(func(c *ComputerConfig) error {
+		if c.ServeToken == "" || renew {
+			b := make([]byte, 24)
+			if _, err := rand.Read(b); err != nil {
+				return err
+			}
+			c.ServeToken = hex.EncodeToString(b)
+		}
+		token = c.ServeToken
+		return nil
+	})
+	return token, err
 }
 
 // BookSync is the sync setup of one book on this computer.
@@ -57,6 +91,11 @@ func (p Paths) LoadConfig() (ComputerConfig, error) {
 	if c.CurrentBook != "" {
 		if err := ValidateBookName(c.CurrentBook); err != nil {
 			return c, fmt.Errorf("%s: current_book: %w", p.ConfigFile(), err)
+		}
+	}
+	if c.ServePort != 0 {
+		if err := validatePort(c.ServePort); err != nil {
+			return c, fmt.Errorf("%s: %w", p.ConfigFile(), err)
 		}
 	}
 	if c.BackupDir != "" && !filepath.IsAbs(expandHome(c.BackupDir)) {

@@ -456,13 +456,14 @@ If the balances are different, moolah lists the transactions near that date that
 
 ```sh
 moolah serve
-moolah running at http://127.0.0.1:41873/?token=…   (Ctrl+C to stop)
+moolah running at http://127.0.0.1:8473/?token=…   (Ctrl+C to stop)
 ```
 
 Your browser opens automatically. The browser UI has the same features as the command line: transactions, adding and editing, review of imports, accounts, categories and reports. History is only on the command line for now. It uses the same data, so you can use the command line and the browser at the same time.
 
 - The server is only reachable from your own computer.
-- `--port 8080` uses a fixed port. `--no-browser` doesn't open a browser.
+- The port is 8473, or the `serve_port` setting (`moolah config set serve_port 9000`). If that port is busy, for example because another book is already served, moolah uses a free port and says which. `--port 9000` uses exactly that port, or stops with an error if it is busy. `--no-browser` doesn't open a browser.
+- The sign-in token stays the same between runs, so a bookmark (`http://127.0.0.1:8473/`) and open tabs keep working after a restart. It is in this computer's `config.toml`. `moolah serve --new-token` replaces it and signs out every browser.
 - The server stops when you press Ctrl+C or close the terminal.
 
 ## Languages and right-to-left text
@@ -764,6 +765,7 @@ base_currency     EUR     book
 locale            de_DE   book
 offline           false   this computer
 rate_sources              book
+serve_port        8473    this computer
 ```
 
 | Setting | Stored in | Default | Meaning |
@@ -774,6 +776,7 @@ rate_sources              book
 | `backup_recipient` | book | none | age or SSH **public** key that encrypts backups and sync snapshots; none means a passphrase is used |
 | `backup_dir` | this computer | `~/.local/share/moolah/backups` | backup folder |
 | `offline` | this computer | `false` | `true`: never download exchange rates |
+| `serve_port` | this computer | `8473` | port of `moolah serve` (1024–65535) |
 
 Changing `base_currency` changes no stored data. Only reports change.
 

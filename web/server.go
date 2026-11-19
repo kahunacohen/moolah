@@ -4,7 +4,7 @@ package web
 
 import (
 	"context"
-	"crypto/rand"
+	"crypto/sha256"
 	"crypto/subtle"
 	"embed"
 	"encoding/hex"
@@ -52,16 +52,22 @@ type Server struct {
 	tr         map[string]map[string]string
 }
 
-// New prepares a server for an open book. addr is the listen address (127.0.0.1:port).
-func New(a *app.App, addr string, books int) (*Server, error) {
-	s := &Server{Addr: addr, app: a, books: books, pages: map[string]*template.Template{}, tr: map[string]map[string]string{}}
-	var err error
-	if s.token, err = randomHex(); err != nil {
-		return nil, err
+// Options configures a Server.
+type Options struct {
+	Addr  string // listen address, 127.0.0.1:port
+	Books int    // number of books, to decide whether to show the book name
+	Token string // sign-in token; kept between runs so bookmarks and open tabs keep working
+}
+
+// New prepares a server for an open book.
+func New(a *app.App, o Options) (*Server, error) {
+	if len(o.Token) < 32 {
+		return nil, errors.New("the sign-in token is too short")
 	}
-	if s.csrf, err = randomHex(); err != nil {
-		return nil, err
-	}
+	s := &Server{Addr: o.Addr, app: a, books: o.Books, pages: map[string]*template.Template{}, tr: map[string]map[string]string{}, token: o.Token}
+	// Derived from the token, so a form in a tab opened before a restart still saves.
+	sum := sha256.Sum256([]byte("csrf:" + o.Token))
+	s.csrf = hex.EncodeToString(sum[:])
 	files, err := fs.ReadDir(i18nFS, "i18n")
 	if err != nil {
 		return nil, err
@@ -120,14 +126,6 @@ func New(a *app.App, addr string, books int) (*Server, error) {
 	return s, nil
 }
 
-func randomHex() (string, error) {
-	b := make([]byte, 24)
-	if _, err := rand.Read(b); err != nil {
-		return "", err
-	}
-	return hex.EncodeToString(b), nil
-}
-
 // URL is the address to open in the browser, with the session token.
 func (s *Server) URL() string { return "http://" + s.Addr + "/?token=" + s.token }
 
@@ -178,7 +176,7 @@ func (s *Server) protect(next http.Handler) http.Handler {
 				http.Error(w, "wrong token: open the address that moolah serve printed", http.StatusForbidden)
 				return
 			}
-			http.SetCookie(w, &http.Cookie{Name: cookieName, Value: s.token, Path: "/", HttpOnly: true, SameSite: http.SameSiteStrictMode})
+			http.SetCookie(w, &http.Cookie{Name: cookieName, Value: s.token, Path: "/", HttpOnly: true, SameSite: http.SameSiteStrictMode, MaxAge: 365 * 24 * 3600})
 			q := r.URL.Query()
 			q.Del("token")
 			u := *r.URL

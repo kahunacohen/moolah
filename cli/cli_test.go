@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"flag"
 	"fmt"
+	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -273,6 +274,34 @@ func TestScenarios(t *testing.T) {
 		s.run("config list")
 		s.golden("books")
 	})
+}
+
+// A busy configured port does not stop "moolah serve": it falls back to a free port
+// with a warning. A port typed with --port must be free.
+func TestServeListen(t *testing.T) {
+	busy, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer busy.Close()
+	port := busy.Addr().(*net.TCPAddr).Port
+	s := newSession(t)
+	if err := s.env.UpdateConfig(func(c *app.ComputerConfig) error { c.ServePort = port; return nil }); err != nil {
+		t.Fatal(err)
+	}
+	var errOut bytes.Buffer
+	g := &globals{env: Env{Paths: s.env, Stderr: &errOut}}
+	ln, err := g.listen(0, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ln.Close()
+	if ln.Addr().(*net.TCPAddr).Port == port || !strings.Contains(errOut.String(), "is busy") {
+		t.Fatalf("no fallback: %s", errOut.String())
+	}
+	if _, err := g.listen(port, true); err == nil || !strings.Contains(err.Error(), "--port") {
+		t.Fatalf("busy --port accepted: %v", err)
+	}
 }
 
 func TestImportScenario(t *testing.T) {

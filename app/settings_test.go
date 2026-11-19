@@ -28,6 +28,34 @@ func TestSettingPlaces(t *testing.T) {
 			t.Fatalf("got %q", v)
 		}
 	})
+	// serve_port shows the default until set, and a port outside 1024–65535 is refused.
+	t.Run("serve port default and range", func(t *testing.T) {
+		a := newBook(t)
+		if v, _ := a.Config(ctx, KeyServePort); v != "8473" {
+			t.Fatalf("default: got %q", v)
+		}
+		if err := a.SetConfig(ctx, KeyServePort, "80"); err == nil {
+			t.Fatal("port 80 accepted")
+		}
+		mustDo(t, func() error { return a.SetConfig(ctx, KeyServePort, "9000") })
+		if c, _ := a.Paths.LoadConfig(); c.Port() != 9000 {
+			t.Fatalf("got %d", c.Port())
+		}
+	})
+	// The browser sign-in token survives a restart, so bookmarks keep working; renewing it signs browsers out.
+	t.Run("serve token kept until renewed", func(t *testing.T) {
+		a := newBook(t)
+		first, err := a.Paths.ServeToken(false)
+		if err != nil || len(first) < 32 {
+			t.Fatalf("got %q, %v", first, err)
+		}
+		if again, _ := a.Paths.ServeToken(false); again != first {
+			t.Fatal("token changed without renew")
+		}
+		if renewed, _ := a.Paths.ServeToken(true); renewed == first {
+			t.Fatal("renew kept the old token")
+		}
+	})
 	// A typo in config.toml is an error that names the file and the key.
 	t.Run("unknown key in config.toml", func(t *testing.T) {
 		a := newBook(t)

@@ -34,7 +34,7 @@ func newServer(t *testing.T) (*Server, *app.App) {
 	if _, err := a.AddAccount(context.Background(), app.AddAccountParams{Name: "assets:bank:leumi", Currency: "ILS", Opening: "1000", OpeningDate: core.MustDate("2026-10-01")}); err != nil {
 		t.Fatal(err)
 	}
-	s, err := New(a, addr, 1)
+	s, err := New(a, Options{Addr: addr, Books: 1, Token: strings.Repeat("ab", 24)})
 	if err != nil {
 		t.Fatal(err)
 	}

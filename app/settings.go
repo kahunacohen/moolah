@@ -25,6 +25,7 @@ const (
 	KeyBackupRecipient = "backup_recipient"
 	KeyBaseCurrency    = "base_currency"
 	KeyLocale          = "locale"
+	KeyServePort       = "serve_port"
 )
 
 // SettingPlace tells where a setting is stored.
@@ -43,6 +44,7 @@ var settingPlaces = map[string]SettingPlace{
 	KeyLocale:          PlaceBook,
 	KeyOffline:         PlaceComputer,
 	KeyRateSources:     PlaceBook,
+	KeyServePort:       PlaceComputer,
 }
 
 // SettingKeys lists the settings a user may change, sorted.
@@ -163,6 +165,12 @@ func validateSetting(key, value string) error {
 		return nil
 	case KeyRateSources:
 		return nil // checked against the existing sources in SetConfig
+	case KeyServePort:
+		n, err := strconv.Atoi(value)
+		if err != nil {
+			return fmt.Errorf("serve_port must be a number, for example %d", DefaultServePort)
+		}
+		return validatePort(n)
 	}
 	return fmt.Errorf("unknown setting %q: use one of %s", key, strings.Join(SettingKeys, ", "))
 }
@@ -182,6 +190,8 @@ func (a *App) Config(ctx context.Context, key string) (string, error) {
 			return c.BackupDir, nil
 		case KeyOffline:
 			return strconv.FormatBool(c.Offline), nil
+		case KeyServePort:
+			return strconv.Itoa(c.Port()), nil
 		}
 	}
 	v, _, err := a.st.Setting(ctx, key)
@@ -251,6 +261,8 @@ func (a *App) SetConfig(ctx context.Context, key, value string) error {
 				c.BackupDir = value
 			case KeyOffline:
 				c.Offline = value == "true"
+			case KeyServePort:
+				c.ServePort, _ = strconv.Atoi(value) // checked above; empty means the default
 			}
 			return nil
 		})
@@ -261,6 +273,13 @@ func (a *App) SetConfig(ctx context.Context, key, value string) error {
 		}
 		return tx.SetSetting(ctx, key, value)
 	})
+}
+
+func validatePort(n int) error {
+	if n < 1024 || n > 65535 {
+		return fmt.Errorf("serve_port must be between 1024 and 65535, got %d", n)
+	}
+	return nil
 }
 
 func knownKey(key string) error {

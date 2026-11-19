@@ -147,7 +147,7 @@ web/          htmx server-rendered UI → app (no separate JSON API)
 Rules (written in the repo `CLAUDE.md`): `core` imports nothing from the project; `cli` and `web` call only `app`; only `store` contains SQL.
 
 ## 8. Tech stack
-- Go, one static binary. `moolah serve` listens on `127.0.0.1` only (random free port by default, `--port` to fix it), prints the URL and opens the browser. It runs in the foreground; Ctrl+C stops it. Local security: a random session token (from the URL, stored in an HttpOnly cookie), a `Host` header check (blocks DNS rebinding), and an `Origin` check plus CSRF token on POST (blocks other websites from sending requests to localhost).
+- Go, one static binary. `moolah serve` listens on `127.0.0.1` only (port 8473 or the `serve_port` setting, falling back to a free port when busy; `--port` requires one exact port), prints the URL and opens the browser. It runs in the foreground; Ctrl+C stops it. Local security: a random session token kept in this computer's `config.toml` so bookmarks survive restarts (`serve --new-token` replaces it; from the URL, stored in an HttpOnly cookie; the CSRF token is derived from it), a `Host` header check (blocks DNS rebinding), and an `Origin` check plus CSRF token on POST (blocks other websites from sending requests to localhost).
 - SQLite driver: `ncruces/go-sqlite3` (pure Go; has encrypting VFS for later). **Check its maturity in phase 0**; fallback `modernc.org/sqlite`. WAL mode, so the CLI and the web server can run at the same time.
 - `cobra`, `html/template` + htmx, `embed.FS`, `golang.org/x/text`, `filippo.io/age`, `excelize` for XLSX.
 - Data at `~/.local/share/moolah/moolah.db` (mode 0600). `moolah backup` = `VACUUM INTO` + age encryption.

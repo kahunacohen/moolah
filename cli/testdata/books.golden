@@ -46,6 +46,7 @@ base_currency     ILS    book
 locale            en_US  book
 offline           true   this computer
 rate_sources             book
+serve_port        8473   this computer
 
 "book" settings sync with your other computers; "this computer" settings are in $TMP/config/config.toml.
 
