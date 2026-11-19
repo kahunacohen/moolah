@@ -103,13 +103,23 @@ func (a *App) ProfileText(ctx context.Context, name string) (string, error) {
 	return t, nil
 }
 
-// SaveProfile validates a TOML profile and stores it in the book. It returns the profile name.
-func (a *App) SaveProfile(ctx context.Context, text string) (string, error) {
+// SaveProfile validates a TOML profile and stores it in the book. It returns the
+// profile name, and whether it replaced one of the user's profiles with that name.
+func (a *App) SaveProfile(ctx context.Context, text string) (string, bool, error) {
 	p, err := importers.ParseProfile(text)
 	if err != nil {
-		return "", err
+		return "", false, err
 	}
-	return p.Name, a.st.InTx(ctx, func(tx *store.Tx) error { return tx.UpsertProfile(ctx, p.Name, text) })
+	var replaced bool
+	err = a.st.InTx(ctx, func(tx *store.Tx) error {
+		user, err := tx.UserProfiles(ctx)
+		if err != nil {
+			return err
+		}
+		_, replaced = user[p.Name]
+		return tx.UpsertProfile(ctx, p.Name, text)
+	})
+	return p.Name, replaced, err
 }
 
 // RemoveProfile removes a user profile.
@@ -225,7 +235,7 @@ func (a *App) Import(ctx context.Context, p ImportParams) (ImportResult, error) 
 		sort.Strings(found)
 		switch len(found) {
 		case 0:
-			return res, errors.New("no import profile matches this file. Write one (see: moolah profile show generic-csv), or choose one with --profile")
+			return res, errors.New("no import profile matches this file. Create one from it with: moolah profile create " + p.File + "\nor choose a profile with --profile")
 		case 1:
 			name = found[0]
 		default:

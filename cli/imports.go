@@ -161,11 +161,15 @@ func profileCmd(g *globals) *cobra.Command {
 				return err
 			}
 			return g.withBook(func(a *app.App) error {
-				name, err := a.SaveProfile(cmd.Context(), string(b))
+				name, replaced, err := a.SaveProfile(cmd.Context(), string(b))
 				if err != nil {
 					return err
 				}
-				fmt.Fprintf(g.out(), "Saved profile %s. Test it with: moolah import test <file> --profile %s\n", name, name)
+				verb := "Saved"
+				if replaced {
+					verb = "Replaced"
+				}
+				fmt.Fprintf(g.out(), "%s profile %s. Test it with: moolah import test <file> --profile %s\n", verb, name, name)
 				return nil
 			})
 		},
@@ -198,7 +202,7 @@ func profileCmd(g *globals) *cobra.Command {
 						return err
 					}
 					text = string(b)
-					name, err := a.SaveProfile(cmd.Context(), text)
+					name, _, err := a.SaveProfile(cmd.Context(), text)
 					if err == nil {
 						fmt.Fprintf(g.out(), "Saved profile %s.\n", name)
 						return nil
@@ -227,7 +231,7 @@ func profileCmd(g *globals) *cobra.Command {
 			})
 		},
 	}
-	cmd.AddCommand(list, show, export, add, edit, remove)
+	cmd.AddCommand(list, show, export, profileCreateCmd(g), add, edit, remove)
 	return cmd
 }
 

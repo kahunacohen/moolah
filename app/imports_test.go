@@ -237,7 +237,7 @@ func TestReviewAndReconcile(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, err := a.SaveProfile(ctx, strings.Replace(text, `date_format = "2006-01-02"`, `date_format = "02/01/2006"`, 1)); err != nil {
+		if _, _, err := a.SaveProfile(ctx, strings.Replace(text, `date_format = "2006-01-02"`, `date_format = "02/01/2006"`, 1)); err != nil {
 			t.Fatal(err)
 		}
 		res := importOK(t, a, ImportParams{File: csvFile(t, "05/10/2026,Coffee,-12"), Account: "leumi"})

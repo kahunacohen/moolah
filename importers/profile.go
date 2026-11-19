@@ -91,11 +91,19 @@ func ParseProfile(text string) (*Profile, error) {
 
 var profileNameRe = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]{0,39}$`)
 
+// ValidProfileName checks a profile name.
+func ValidProfileName(name string) error {
+	if !profileNameRe.MatchString(name) {
+		return fmt.Errorf("name %q must start with a letter or digit and use only lower-case letters, digits, - and _ (at most 40)", name)
+	}
+	return nil
+}
+
 func (p *Profile) validate() error {
 	c := p.Columns
 	switch {
-	case !profileNameRe.MatchString(p.Name):
-		return fmt.Errorf("profile: name %q must use lower-case letters, digits, - and _", p.Name)
+	case ValidProfileName(p.Name) != nil:
+		return fmt.Errorf("profile: %w", ValidProfileName(p.Name))
 	case len(p.Detect.Headers) == 0:
 		return fmt.Errorf("profile %s: [detect] headers is required", p.Name)
 	case c.Date == "":
@@ -226,7 +234,17 @@ func (e RowError) Error() string { return fmt.Sprintf("line %d: %v", e.Line, e.E
 func (p *Profile) Parse(g Grid) ([]Row, []RowError, error) {
 	hi := p.headerRow(g)
 	if hi < 0 {
-		return nil, nil, fmt.Errorf("profile %s: the header row was not found", p.Name)
+		quoted := make([]string, len(p.Detect.Headers))
+		for i, h := range p.Detect.Headers {
+			quoted[i] = strconv.Quote(h)
+		}
+		where := "No row has all of these names: " + strings.Join(quoted, ", ")
+		if p.Table.HeaderRow > 0 {
+			where = fmt.Sprintf("The file has fewer than %d rows", p.Table.HeaderRow)
+		}
+		return nil, nil, fmt.Errorf("profile %s: the header row was not found. %s. The file starts with:%s\n"+
+			"Fix the profile with: moolah profile edit %s, or create one from this file with: moolah profile create <file>",
+			p.Name, where, GridPreview(g, 8), p.Name)
 	}
 	col := map[string]int{}
 	for i, h := range g[hi] {

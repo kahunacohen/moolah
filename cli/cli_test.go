@@ -381,6 +381,44 @@ func TestImportScenario(t *testing.T) {
 		s.run("register chase")
 		s.golden("import-currencies")
 	})
+	// A profile is created from an unknown export with only the unclear questions,
+	// any line can be changed before saving, and saving over a name shows the changes first.
+	t.Run("profile create", func(t *testing.T) {
+		s := newSession(t)
+		file := filepath.Join(filepath.Dir(s.env.DataDir), "statement.csv")
+		text := "Account statement 12-345\n\nBooking date;Text;Reference;Debit;Credit;Balance\n" +
+			"03/10/2026;SUPERMARKET;100234;123,40;;1.876,60\n04/10/2026;SALARY ACME;100235;;3.500,00;5.376,60\n" +
+			"Total;;;123,40;3.500,00;\n"
+		if err := os.WriteFile(file, []byte(text), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		s.run("init --base EUR --no-backup-key")
+		s.run("account add checking --kind bank --currency EUR")
+		s.run("import " + file + " --account checking")
+		s.run("profile create " + file)
+		s.answers = "1\n1\n\n\n\nmybank\n5\nq\n"
+		s.run("profile create " + file)
+		s.answers = "1\n1\n\n\n\nmybank\n4\n1\ns\n"
+		s.run("profile create " + file)
+		s.answers = "1\n1\n\n\n\nmybank\ns\ny\n"
+		s.run("profile create " + file)
+		s.run("profile show mybank")
+		s.run("import test " + file + " --account checking")
+		card := filepath.Join(filepath.Dir(s.env.DataDir), "card.csv")
+		// A card export: positive charges, currency symbols, foreign purchases, installments and a pending row.
+		cardText := "תאריך עסקה,שם בית העסק,סכום עסקה,מטבע עסקה,סכום חיוב,מטבע חיוב,סטטוס,הערות\n" +
+			"01/10/2026,סופר שוק,123.40,₪,123.40,₪,סופית,\n03/10/2026,AMAZON,45.00,$,165.30,₪,סופית,\n" +
+			"05/10/2026,איקאה,1200.00,₪,100.00,₪,סופית,תשלום 3 מתוך 12\n25/10/2026,קפה,12.00,₪,12.00,₪,בקליטה,\n"
+		if err := os.WriteFile(card, []byte(cardText), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		s.answers = "2\ny\n3\nILS\n2\nUSD\n\n2\n\n3\nisracard\ns\n"
+		s.run("profile create " + card)
+		s.run("profile show isracard")
+		s.run("account add isracard --kind card --currency ILS")
+		s.run("import test " + card + " --account isracard")
+		s.golden("profile-create")
+	})
 }
 
 func TestInitQuestions(t *testing.T) {

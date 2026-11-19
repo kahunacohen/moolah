@@ -1,0 +1,241 @@
+$ moolah init --base EUR --no-backup-key
+Book "main" is ready in $TMP/data/books/main.db (base currency EUR).
+Next: add your accounts, for example:
+  moolah account add Checking --kind bank --currency EUR --opening 1000
+  moolah category list
+
+$ moolah account add checking --kind bank --currency EUR
+Added account checking (EUR).
+
+$ moolah import $TMP/statement.csv --account checking
+error: no import profile matches this file. Create one from it with: moolah profile create $TMP/statement.csv
+or choose a profile with --profile
+[exit 1]
+
+$ moolah profile create $TMP/statement.csv
+error: profile create asks questions, so it needs a terminal. Without one, write the profile by hand and save it with: moolah profile add <file.toml>
+[exit 1]
+
+$ moolah profile create $TMP/statement.csv    # answers: 1 | 1 |  |  |  | mybank | 5 | q
+File: CSV, 2 transaction rows.
+Column names are in line 2; the lines above it are skipped.
+The dates in "Booking date" (for example 03/10/2026) can be read in more than one way.
+   1  dd/mm/yyyy → 3 October 2026
+   2  mm/dd/yyyy → 10 March 2026
+Which is right? [1]: Each row has an amount in either "Debit" or "Credit".
+   1  "Debit" (for example "123,40")
+   2  "Credit" (for example "3.500,00")
+Which column is money out (debit)? [1]: Payee (description): "Text" (for example "SUPERMARKET", "SALARY ACME"). Right? [Y/n]: Is "Reference" (for example "100234", "100235") the bank's reference number? moolah then uses it to recognize rows imported before. [Y/n]: Line 5, after the transactions, has "Total" (a total?). Stop reading there? [Y/n]: Profile name (for example the bank's name) [statement]: 
+   1  date         "Booking date", dd/mm/yyyy
+   2  amount       debit "Debit" (money out), credit "Credit" (money in)
+   3  currency     the account's currency
+   4  foreign      none
+   5  payee        "Text"
+   6  note         none
+   7  reference    "Reference"
+   8  charge date  none
+   9  installments none
+  10  skip rows    none
+  11  read until   the row with "Total"
+  12  name         mybank
+      Not used: "Balance"
+
+The file as it would be imported (2 rows):
+  line 3    2026-10-03  SUPERMARKET                            -123.4
+  line 4    2026-10-04  SALARY ACME                              3500
+
+[s]ave, [1-12] change a line, [e]dit the profile text, [q]uit [s]:    1  "Text" (for example "SUPERMARKET", "SALARY ACME")
+Which column is the payee (description)? [1]: Type a number from 1 to 1.
+Which column is the payee (description)? [1]: error: no answer (input ended)
+[exit 1]
+
+$ moolah profile create $TMP/statement.csv    # answers: 1 | 1 |  |  |  | mybank | 4 | 1 | s
+File: CSV, 2 transaction rows.
+Column names are in line 2; the lines above it are skipped.
+The dates in "Booking date" (for example 03/10/2026) can be read in more than one way.
+   1  dd/mm/yyyy → 3 October 2026
+   2  mm/dd/yyyy → 10 March 2026
+Which is right? [1]: Each row has an amount in either "Debit" or "Credit".
+   1  "Debit" (for example "123,40")
+   2  "Credit" (for example "3.500,00")
+Which column is money out (debit)? [1]: Payee (description): "Text" (for example "SUPERMARKET", "SALARY ACME"). Right? [Y/n]: Is "Reference" (for example "100234", "100235") the bank's reference number? moolah then uses it to recognize rows imported before. [Y/n]: Line 5, after the transactions, has "Total" (a total?). Stop reading there? [Y/n]: Profile name (for example the bank's name) [statement]: 
+   1  date         "Booking date", dd/mm/yyyy
+   2  amount       debit "Debit" (money out), credit "Credit" (money in)
+   3  currency     the account's currency
+   4  foreign      none
+   5  payee        "Text"
+   6  note         none
+   7  reference    "Reference"
+   8  charge date  none
+   9  installments none
+  10  skip rows    none
+  11  read until   the row with "Total"
+  12  name         mybank
+      Not used: "Balance"
+
+The file as it would be imported (2 rows):
+  line 3    2026-10-03  SUPERMARKET                            -123.4
+  line 4    2026-10-04  SALARY ACME                              3500
+
+[s]ave, [1-12] change a line, [e]dit the profile text, [q]uit [s]: The file has no other column of amounts with a column of currencies.
+
+   1  date         "Booking date", dd/mm/yyyy
+   2  amount       debit "Debit" (money out), credit "Credit" (money in)
+   3  currency     the account's currency
+   4  foreign      none
+   5  payee        "Text"
+   6  note         none
+   7  reference    "Reference"
+   8  charge date  none
+   9  installments none
+  10  skip rows    none
+  11  read until   the row with "Total"
+  12  name         mybank
+      Not used: "Balance"
+
+The file as it would be imported (2 rows):
+  line 3    2026-10-03  SUPERMARKET                            -123.4
+  line 4    2026-10-04  SALARY ACME                              3500
+
+[s]ave, [1-12] change a line, [e]dit the profile text, [q]uit [s]: The dates in "Booking date" (for example 03/10/2026) can be read in more than one way.
+   1  dd/mm/yyyy → 3 October 2026
+   2  mm/dd/yyyy → 10 March 2026
+Which is right? [1]: Type a number from 1 to 2.
+Which is right? [1]: error: no answer (input ended)
+[exit 1]
+
+$ moolah profile create $TMP/statement.csv    # answers: 1 | 1 |  |  |  | mybank | s | y
+Saved profile mybank in this book.
+Import the file with: moolah import $TMP/statement.csv --account <account>
+Change the profile later with: moolah profile edit mybank
+File: CSV, 2 transaction rows.
+Column names are in line 2; the lines above it are skipped.
+The dates in "Booking date" (for example 03/10/2026) can be read in more than one way.
+   1  dd/mm/yyyy → 3 October 2026
+   2  mm/dd/yyyy → 10 March 2026
+Which is right? [1]: Each row has an amount in either "Debit" or "Credit".
+   1  "Debit" (for example "123,40")
+   2  "Credit" (for example "3.500,00")
+Which column is money out (debit)? [1]: Payee (description): "Text" (for example "SUPERMARKET", "SALARY ACME"). Right? [Y/n]: Is "Reference" (for example "100234", "100235") the bank's reference number? moolah then uses it to recognize rows imported before. [Y/n]: Line 5, after the transactions, has "Total" (a total?). Stop reading there? [Y/n]: Profile name (for example the bank's name) [statement]: 
+   1  date         "Booking date", dd/mm/yyyy
+   2  amount       debit "Debit" (money out), credit "Credit" (money in)
+   3  currency     the account's currency
+   4  foreign      none
+   5  payee        "Text"
+   6  note         none
+   7  reference    "Reference"
+   8  charge date  none
+   9  installments none
+  10  skip rows    none
+  11  read until   the row with "Total"
+  12  name         mybank
+      Not used: "Balance"
+
+The file as it would be imported (2 rows):
+  line 3    2026-10-03  SUPERMARKET                            -123.4
+  line 4    2026-10-04  SALARY ACME                              3500
+
+[s]ave, [1-12] change a line, [e]dit the profile text, [q]uit [s]: 
+$ moolah profile show mybank
+name = "mybank"
+description = "Created from statement.csv"
+
+[detect]
+headers = ["Booking date", "Text", "Debit", "Credit"]
+
+[table]
+stop = "Total"
+
+[columns]
+date = "Booking date"
+date_format = "02/01/2006"
+payee = "Text"
+external_id = "Reference"
+debit = "Debit"
+credit = "Credit"
+decimal_comma = true
+
+$ moolah import test $TMP/statement.csv --account checking
+Profile mybank, account checking. Nothing was saved (test only).
+
+Line  Date        Payee              Amount  Category       Status
+   3  2026-10-03  SUPERMARKET   -123.40 EUR  uncategorized  new
+   4  2026-10-04  SALARY ACME  3,500.00 EUR  uncategorized  new
+
+$ moolah profile create $TMP/card.csv    # answers: 2 | y | 3 | ILS | 2 | USD |  | 2 |  | 3 | isracard | s
+Saved profile isracard in this book.
+Import the file with: moolah import $TMP/card.csv --account <account>
+Change the profile later with: moolah profile edit isracard
+File: CSV, 4 transaction rows.
+   1  "סכום עסקה" (for example "123.40", "45.00", "1200.00")
+   2  "סכום חיוב" (for example "123.40", "165.30", "100.00")
+Which column is the amount? [1]: Line 2: "סופר שוק" shows 123.40 in "סכום חיוב". Did money leave the account? [Y/n]:    1  none: the account's currency
+   2  "מטבע עסקה" (for example "₪", "$")
+   3  "מטבע חיוב" (for example "₪")
+Which column is the currency of the amount? [1]: What currency is "₪"? Type its code, for example USD, EUR or ILS: For a purchase in another currency, a card export often shows the original amount too.
+   1  none
+   2  "סכום עסקה" (for example "123.40", "45.00", "1200.00")
+Which column is the original amount? [1]: What currency is "$"? Type its code, for example USD, EUR or ILS: Payee (description): "שם בית העסק" (for example "סופר שוק", "AMAZON", "איקאה"). Right? [Y/n]:    1  none
+   2  "הערות" (for example "תשלום 3 מתוך 12")
+Which column has extra details to keep as the note? [1]: Line 4 has "תשלום 3 מתוך 12" in "הערות". Is this payment 3 of 12 of a purchase in installments? [Y/n]: Column "סטטוס" has only these values. Some exports mark rows that are not final yet (pending).
+   1  none: import every row
+   2  "סופית" (3 rows)
+   3  "בקליטה" (1 row)
+Skip the rows with which value? [1]: Profile name (for example the bank's name) [card]: 
+   1  date         "תאריך עסקה", dd/mm/yyyy
+   2  amount       "סכום חיוב" (positive = money out)
+   3  currency     "מטבע חיוב" (₪ = ILS)
+   4  foreign      original amount "סכום עסקה" in "מטבע עסקה" (₪ = ILS, $ = USD)
+   5  payee        "שם בית העסק"
+   6  note         "הערות"
+   7  reference    none
+   8  charge date  none
+   9  installments "הערות", pattern '(\d+) מתוך (\d+)'
+  10  skip rows    rows with "בקליטה" in "סטטוס"
+  11  read until   the end of the file
+  12  name         isracard
+
+The file as it would be imported (3 rows):
+  line 2    2026-10-01  סופר שוק                               -123.4
+  line 3    2026-10-03  AMAZON                                 -165.3
+  line 4    2026-10-05  איקאה                                    -100
+
+[s]ave, [1-12] change a line, [e]dit the profile text, [q]uit [s]: 
+$ moolah profile show isracard
+name = "isracard"
+description = "Created from card.csv"
+
+[detect]
+headers = ["תאריך עסקה", "שם בית העסק", "סכום חיוב"]
+
+[table]
+skip = [{ column = "סטטוס", contains = "בקליטה" }]
+
+[columns]
+date = "תאריך עסקה"
+date_format = "02/01/2006"
+payee = "שם בית העסק"
+memo = "הערות"
+amount = "סכום חיוב"
+negate = true
+currency = "מטבע חיוב"
+orig_amount = "סכום עסקה"
+orig_currency = "מטבע עסקה"
+installment = "הערות"
+installment_pattern = '(\d+) מתוך (\d+)'
+
+[currency_map]
+"$" = "USD"
+"₪" = "ILS"
+
+$ moolah account add isracard --kind card --currency ILS
+Added account isracard (ILS).
+
+$ moolah import test $TMP/card.csv --account isracard
+Profile isracard, account isracard. Nothing was saved (test only).
+
+Line  Date        Payee          Amount  Category       Status
+   2  2026-10-01  סופר שוק  -123.40 ILS  uncategorized  new
+   3  2026-10-03  AMAZON    -165.30 ILS  uncategorized  new
+   4  2026-10-05  איקאה     -100.00 ILS  uncategorized  new
+

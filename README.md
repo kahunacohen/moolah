@@ -4,7 +4,7 @@ A personal finance tool for the command line, with an optional browser UI that r
 
 moolah tracks bank accounts, credit cards and retirement accounts in any currency, and reports everything in **one base currency that you choose**. Your data is one SQLite file on your computer. Nothing is sent anywhere, except requests for public exchange rates.
 
-> **Status:** everything in this README works. Only one built-in import profile ships (`generic-csv`); for your bank, [write a profile](#import-profiles) in a few lines of TOML. Investment holdings and lots are not planned.
+> **Status:** everything in this README works. The web UI (`moolah serve`) works but is still rough.
 
 **This README explains ideas and workflows. For the exact commands and flags, use the built-in help:** `moolah -h` lists all commands, and `moolah <command> -h` (for example `moolah account -h` or `moolah account add -h`) shows the options and examples.
 
@@ -176,32 +176,17 @@ When the two accounts have **different currencies**, each export has only one of
 
 ### Import profiles
 
-A profile is a small TOML file that describes one bank's export. No code change or rebuild is needed. Profiles are stored in the book, so backups and sync include them.
+A profile tells moolah how to read one bank's export file. moolah ships no bank profiles; you create one from your bank's export, once:
 
 ```sh
-moolah profile show generic-csv > my-bank.toml   # start from a similar profile, then edit it
-moolah profile add my-bank.toml                  # checks it and saves it in the book
-moolah import test ~/Downloads/export.xls --profile my-bank --account checking   # imports nothing
-moolah profile edit my-bank                      # fix it in $EDITOR
+moolah profile create ~/Downloads/export.xlsx
 ```
 
-```toml
-name = "my-bank"
-encoding = "windows-1252"     # only for files that are not UTF-8
+moolah finds the column names, dates, amounts and description by itself, and asks only what the file does not show, for example whether `03/10/2026` is 3 October or 10 March, or whether a positive amount is money out. Then it shows a summary and the first rows as they would be imported. You can change any answer, or edit the profile text, before saving. The profile is saved in the book, so backups and sync include it.
 
-[detect]
-headers = ["Booking date", "Description", "Debit", "Credit"]
+Later changes: `moolah profile edit <name>` opens it in `$EDITOR`. If the bank changes its export, run `profile create` again with the same name; moolah shows what changes before it replaces the profile.
 
-[columns]
-date = "Booking date"
-date_format = "02.01.2006"    # Go layout: day.month.year
-payee = "Description"
-memo = "Reference"            # becomes the note
-debit = "Debit"
-credit = "Credit"
-```
-
-[docs/profiles.md](docs/profiles.md) lists every key, with a card example (pending rows, foreign purchases, installments).
+[docs/profiles.md](docs/profiles.md) has the full guide: common problems, and every key for editing a profile by hand (pending rows, foreign purchases, installments).
 
 ## Pension and retirement accounts
 
@@ -425,7 +410,7 @@ With more than one book, reports and the browser UI show the book name.
 | `transaction does not balance: USD +12.00` | The lines don't add up to zero in that currency. |
 | `no USD→EUR rate on or before 2026-09-14` | Connect to the network and run `moolah rates fetch`, or add the rate with `moolah rates add`. |
 | `account old-card is closed since 2026-10-31` | The date is after the account's close date. |
-| `no import profile matches this file` | [Write a profile](#import-profiles) for your bank. |
+| `no import profile matches this file` | [Create a profile](#import-profiles) from the file: `moolah profile create <file>`. |
 | An import gave wrong amounts or dates | `moolah import undo <id>`, fix the profile, and check it with `moolah import test` before you import again. |
 | `conflict: … both changed data` | See [Several computers](#several-computers). Choose a copy with `moolah sync resolve`. |
 | `changed elsewhere, reload` | The transaction changed after you opened it. Reload the page and edit again. |
@@ -462,8 +447,6 @@ crypt       age encryption
 store       SQLite; the only package with SQL
 core        domain rules; no I/O
 ```
-
-**A built-in import profile** goes in `importers/profiles/`, with an anonymized sample file and a test. Keep the structure, headers and number formats exactly, but remove names, account numbers and ID numbers. Never commit a real bank export.
 
 ## License
 

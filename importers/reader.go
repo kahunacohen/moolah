@@ -87,15 +87,15 @@ func decodeText(data []byte, encoding string) (string, error) {
 }
 
 func readCSV(text string) (Grid, error) {
-	first := text
-	if i := strings.IndexByte(text, '\n'); i >= 0 {
-		first = text[:i]
-	}
-	delim := ','
-	best := strings.Count(first, ",")
-	for _, d := range []rune{';', '\t', '|'} {
-		if n := strings.Count(first, string(d)); n > best {
-			delim, best = d, n
+	// Title lines above the table may have no separator, so the separator is the
+	// one that appears most often in a single line among the first lines.
+	lines := strings.SplitN(text, "\n", 21)
+	delim, best := ',', 0
+	for _, d := range []rune{',', ';', '\t', '|'} {
+		for _, l := range lines[:min(len(lines), 20)] {
+			if n := strings.Count(l, string(d)); n > best {
+				delim, best = d, n
+			}
 		}
 	}
 	r := csv.NewReader(strings.NewReader(text))
