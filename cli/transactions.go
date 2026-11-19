@@ -255,11 +255,18 @@ func balanceMap(b core.Balance) map[string]string {
 func registerCmd(g *globals) *cobra.Command {
 	var from, to, tag, category string
 	cmd := &cobra.Command{
-		Use:               "transactions [account]",
-		Aliases:           []string{"register"},
-		Short:             "List transactions, for one account with a running balance",
-		Example:           "  moolah transactions checking\n  moolah transactions --category food --from 2026-10-01",
-		Args:              cobra.MaximumNArgs(1),
+		Use:     "transactions [account]",
+		Aliases: []string{"register", "transaction"},
+		Short:   "List transactions, for one account with a running balance; edit or delete one",
+		Example: "  moolah transactions checking\n  moolah transactions --category food --from 2026-10-01\n  moolah transactions edit 42",
+		Args: func(cmd *cobra.Command, args []string) error {
+			if len(args) > 1 {
+				if s := cmd.SuggestionsFor(args[0]); len(s) > 0 {
+					return fmt.Errorf("unknown command %q. Did you mean: moolah transactions %s?", args[0], s[0])
+				}
+			}
+			return cobra.MaximumNArgs(1)(cmd, args)
+		},
 		ValidArgsFunction: g.completeAccounts(app.ScopeAny),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			p := app.RegisterParams{Tag: tag, Scope: app.ScopeAny}
@@ -282,6 +289,10 @@ func registerCmd(g *globals) *cobra.Command {
 			return g.withBook(func(a *app.App) error {
 				rep, err := a.Register(cmd.Context(), p)
 				if err != nil {
+					// A mistyped subcommand ("eidt") arrives here as an account name.
+					if s := cmd.SuggestionsFor(p.Account); len(args) == 1 && len(s) > 0 {
+						return fmt.Errorf("%w\nDid you mean: moolah transactions %s?", err, s[0])
+					}
 					return err
 				}
 				headers := []string{"ID", "Date", "Payee", "Other side", "Amount"}
@@ -320,6 +331,8 @@ func registerCmd(g *globals) *cobra.Command {
 	cmd.Flags().StringVar(&to, "to", "", "last date")
 	cmd.Flags().StringVar(&tag, "tag", "", "only transactions with this tag")
 	cmd.Flags().StringVar(&category, "category", "", "a category instead of an account")
+	cmd.SuggestionsMinimumDistance = 2
+	cmd.AddCommand(editCmd(g), deleteCmd(g))
 	return cmd
 }
 

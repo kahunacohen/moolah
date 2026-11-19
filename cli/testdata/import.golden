@@ -94,7 +94,7 @@ $ moolah categorize 4 fees
 Transaction 4: restaurants → fees.
 
 $ moolah categorize 1 fees
-error: transaction 1 is not between one account and one category, so it has no single category to change. Change it with: moolah edit 1
+error: transaction 1 is not between one account and one category, so it has no single category to change. Change it with: moolah transactions edit 1
 [exit 1]
 
 $ moolah review set 5 restaurnts

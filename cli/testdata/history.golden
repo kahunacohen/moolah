@@ -21,12 +21,12 @@ Added rule 1.
 $ moolah config set locale de_DE
 Set locale.
 
-$ moolah delete 2 --yes
+$ moolah transactions delete 2 --yes
 Deleted transaction 2.
 
 $ moolah history
 ID  Time              Computer     Command                                                                        Changes
- 7  2026-11-04 12:00  laptop-1a2b  delete 2 --yes                                                                 1 transaction deleted
+ 7  2026-11-04 12:00  laptop-1a2b  transactions delete 2 --yes                                                    1 transaction deleted
  6  2026-11-04 12:00  laptop-1a2b  config set locale de_DE                                                        1 setting changed
  5  2026-11-04 12:00  laptop-1a2b  rule add cafe eat                                                              1 rule added
  4  2026-11-04 12:00  laptop-1a2b  category rename food eat                                                       1 category changed
@@ -43,7 +43,7 @@ Action 4  2026-11-04 12:00  on laptop-1a2b
 
 $ moolah history 7
 Action 7  2026-11-04 12:00  on laptop-1a2b
-  delete 2 --yes
+  transactions delete 2 --yes
 
   transaction 2 deleted
     date: 2026-10-02
@@ -54,7 +54,7 @@ Action 7  2026-11-04 12:00  on laptop-1a2b
 
 $ moolah history --tx 2
 Action 7  2026-11-04 12:00  on laptop-1a2b
-  delete 2 --yes
+  transactions delete 2 --yes
 
   transaction 2 deleted
     date: 2026-10-02
@@ -75,7 +75,7 @@ Action 3  2026-11-04 12:00  on laptop-1a2b
 
 $ moolah --format csv history --limit 2
 ID,Time,Computer,Command,Changes
-7,2026-11-04 12:00,laptop-1a2b,delete 2 --yes,1 transaction deleted
+7,2026-11-04 12:00,laptop-1a2b,transactions delete 2 --yes,1 transaction deleted
 6,2026-11-04 12:00,laptop-1a2b,config set locale de_DE,1 setting changed
 
 $ moolah history prune --before 2026-11-05 --yes

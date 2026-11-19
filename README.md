@@ -227,9 +227,9 @@ Unlike categories, a new tag is created when you first use it.
 moolah transactions checking                # transactions of one account, with running balance
 moolah transactions --category food --from 2026-10-01
 moolah transactions                         # all accounts
-moolah edit <transaction-id>             # opens the transaction in $EDITOR
-moolah delete <transaction-id>
-moolah history --tx <transaction-id>     # every version of the transaction
+moolah transactions edit <transaction-id>   # opens the transaction in $EDITOR
+moolah transactions delete <transaction-id>
+moolah history --tx <transaction-id>        # every version of the transaction
 ```
 
 Without an account, each amount is seen from the transaction's account: a purchase is negative and a refund positive. A transfer between two of your accounts shows its amount without a sign.

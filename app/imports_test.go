@@ -196,7 +196,7 @@ func TestReviewAndReconcile(t *testing.T) {
 		if got, err := a.TransactionCategory(ctx, id); err != nil || got != "fees" {
 			t.Fatalf("got %q, %v", got, err)
 		}
-		if _, err := a.Categorize(ctx, CategorizeParams{TxID: 1, Category: "fees"}); err == nil || !strings.Contains(err.Error(), "moolah edit 1") {
+		if _, err := a.Categorize(ctx, CategorizeParams{TxID: 1, Category: "fees"}); err == nil || !strings.Contains(err.Error(), "moolah transactions edit 1") {
 			t.Fatalf("opening balance: %v", err)
 		}
 	})

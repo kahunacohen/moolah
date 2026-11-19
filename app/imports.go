@@ -989,7 +989,7 @@ func (a *App) Categorize(ctx context.Context, p CategorizeParams) (string, error
 		own, idx, ok := categorySides(tree, t)
 		if !ok {
 			return fmt.Errorf("transaction %d is not between one account and one category, so it has no single category "+
-				"to change. Change it with: moolah edit %d", p.TxID, p.TxID)
+				"to change. Change it with: moolah transactions edit %d", p.TxID, p.TxID)
 		}
 		target, err := postable(tree, p.Category)
 		if err != nil {
