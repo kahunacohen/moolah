@@ -253,12 +253,12 @@ func balanceMap(b core.Balance) map[string]string {
 }
 
 func registerCmd(g *globals) *cobra.Command {
-	var from, to, tag, category string
+	var from, to, tag, category, search string
 	cmd := &cobra.Command{
 		Use:     "transactions [account]",
 		Aliases: []string{"register", "transaction"},
 		Short:   "List transactions, for one account with a running balance; edit or delete one",
-		Example: "  moolah transactions checking\n  moolah transactions --category food --from 2026-10-01\n  moolah transactions edit 42",
+		Example: "  moolah transactions checking\n  moolah transactions --category food --from 2026-10-01\n  moolah transactions --search amazon\n  moolah transactions edit 42",
 		Args: func(cmd *cobra.Command, args []string) error {
 			if len(args) > 1 {
 				if s := cmd.SuggestionsFor(args[0]); len(s) > 0 {
@@ -269,7 +269,7 @@ func registerCmd(g *globals) *cobra.Command {
 		},
 		ValidArgsFunction: g.completeAccounts(app.ScopeAny),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			p := app.RegisterParams{Tag: tag, Scope: app.ScopeAny}
+			p := app.RegisterParams{Search: search, Tag: tag, Scope: app.ScopeAny}
 			var err error
 			if p.From, err = parseDateFlag(from); err != nil {
 				return err
@@ -331,6 +331,7 @@ func registerCmd(g *globals) *cobra.Command {
 	cmd.Flags().StringVar(&to, "to", "", "last date")
 	cmd.Flags().StringVar(&tag, "tag", "", "only transactions with this tag")
 	cmd.Flags().StringVar(&category, "category", "", "a category instead of an account")
+	cmd.Flags().StringVar(&search, "search", "", "only transactions whose payee or note contains this text (any case), or with this amount")
 	cmd.SuggestionsMinimumDistance = 2
 	cmd.AddCommand(editCmd(g), deleteCmd(g))
 	return cmd

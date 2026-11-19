@@ -120,6 +120,14 @@ $ moolah transactions --tag vacation-2026
 ID  Date        Payee                  Note  Other side          Amount
  4  2026-10-05  Amazon #vacation-2026        chase, hobbies  -42.17 USD
 
+$ moolah transactions --search party
+ID  Date        Payee      Note           Other side             Amount
+ 3  2026-10-03  Shufersal  for the party  leumi, groceries  -200.00 ILS
+
+$ moolah transactions leumi --search 300
+ID  Date        Payee        Note  Other side              Amount        Balance
+ 6  2026-10-20  Super-Pharm        health, household  -300.00 ILS  24,500.00 ILS
+
 $ moolah transactions eidt 3
 error: unknown command "eidt". Did you mean: moolah transactions edit?
 [exit 1]

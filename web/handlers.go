@@ -17,6 +17,7 @@ type registerData struct {
 	Account string
 	Choices []string
 	Rows    []app.RegisterRow
+	Search  string
 	Tag     string
 }
 
@@ -42,13 +43,14 @@ func (s *Server) names(r *http.Request, real bool) ([]string, error) {
 
 func (s *Server) register(w http.ResponseWriter, r *http.Request) {
 	p := s.newPage(r, "register", "nav.register")
-	d := registerData{Account: r.URL.Query().Get("account"), Tag: r.URL.Query().Get("tag")}
+	q := r.URL.Query()
+	d := registerData{Account: q.Get("account"), Search: q.Get("search"), Tag: q.Get("tag")}
 	var err error
 	if d.Choices, err = s.names(r, true); err != nil {
 		s.fail(w, r, err)
 		return
 	}
-	rep, err := s.app.Register(r.Context(), app.RegisterParams{Account: d.Account, Tag: d.Tag})
+	rep, err := s.app.Register(r.Context(), app.RegisterParams{Account: d.Account, Search: d.Search, Tag: d.Tag})
 	if err != nil {
 		p.Error = err.Error()
 	}

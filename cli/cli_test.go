@@ -136,6 +136,8 @@ func TestScenarios(t *testing.T) {
 		s.run("transactions leumi")
 		s.run("transactions --category food")
 		s.run("transactions --tag vacation-2026")
+		s.run("transactions --search party")
+		s.run("transactions leumi --search 300")
 		s.run("transactions eidt 3")
 		s.run("transactions delte")
 		s.run("tag list")

@@ -27,6 +27,7 @@
   "delete": "Delete",
   "delete.confirm": "Delete this transaction?",
   "filter": "Show",
+  "search": "Search",
   "all_accounts": "All accounts",
   "no_transactions": "No transactions.",
   "add.title": "Add a transaction",

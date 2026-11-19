@@ -136,7 +136,7 @@ func TestPages(t *testing.T) {
 	// Every page renders without errors.
 	t.Run("all pages render", func(t *testing.T) {
 		s, _ := newServer(t)
-		for _, p := range []string{"/", "/add", "/transfer", "/accounts", "/categories", "/review", "/reports", "/reports?view=income", "/reports?view=networth", "/import", "/tx/1"} {
+		for _, p := range []string{"/", "/?search=cafe", "/add", "/transfer", "/accounts", "/categories", "/review", "/reports", "/reports?view=income", "/reports?view=networth", "/import", "/tx/1"} {
 			if w := s.do(t, req{path: p, cookie: true}); w.Code != http.StatusOK {
 				t.Fatalf("%s: %d %s", p, w.Code, w.Body)
 			}

@@ -124,6 +124,7 @@ type RegisterParams struct {
 	Account string // with sub-accounts; all transactions when empty
 	From    core.Date
 	Scope   Scope
+	Search  string // see core.Transaction.Matches
 	Tag     string
 	To      core.Date
 }
@@ -214,7 +215,7 @@ func (a *App) Register(ctx context.Context, p RegisterParams) (RegisterReport, e
 			}
 		}
 		row.Other = strings.Join(uniq(others), ", ")
-		if !p.From.IsZero() && t.Date.Before(p.From) {
+		if !p.From.IsZero() && t.Date.Before(p.From) || !t.Matches(p.Search) {
 			continue
 		}
 		rep.Rows = append(rep.Rows, row)

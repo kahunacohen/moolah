@@ -359,6 +359,26 @@ func TestBooks(t *testing.T) {
 	})
 }
 
+func TestRegisterSearch(t *testing.T) {
+	// A search hides rows but not their money: the running balance still counts every transaction.
+	t.Run("running balance counts hidden rows", func(t *testing.T) {
+		a := newBook(t)
+		for _, payee := range []string{"Cafe", "Shufersal"} {
+			mustDo(t, func() error {
+				_, err := a.Add(ctx, AddParams{Account: "leumi", Amount: "-100", Category: "food", TxInfo: TxInfo{Payee: payee}})
+				return err
+			})
+		}
+		rep, err := a.Register(ctx, RegisterParams{Account: "leumi", Search: "shufersal"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(rep.Rows) != 1 || rep.Rows[0].Running["ILS"].String() != "24800" {
+			t.Fatalf("got %+v", rep.Rows)
+		}
+	})
+}
+
 func TestRegisterAllAccounts(t *testing.T) {
 	// Without an account, money out is negative and a refund positive, seen from the
 	// one real account; a transfer between two real accounts has no side and shows its size.

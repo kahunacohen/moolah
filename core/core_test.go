@@ -173,6 +173,31 @@ func TestTransactionValidate(t *testing.T) {
 	})
 }
 
+func TestTransactionMatches(t *testing.T) {
+	tx := Transaction{Payee: "AMAZON PRIME", Note: "Sukkah expansion", Postings: []Posting{
+		{AccountID: 6, Amount: NewAmount(dec("-15.89"), "USD")},
+		{AccountID: 8, Amount: NewAmount(dec("15.89"), "USD")},
+	}}
+	// Text is found in the payee or the note, whatever its case.
+	t.Run("payee or note, any case", func(t *testing.T) {
+		if !tx.Matches("amazon") || !tx.Matches("SUKKAH") || tx.Matches("audible") {
+			t.Fatal("wrong text match")
+		}
+	})
+	// A number finds a line with that amount, with either sign, so a statement amount works as typed.
+	t.Run("number matches an amount", func(t *testing.T) {
+		if !tx.Matches("15.89") || !tx.Matches("-15.890") || tx.Matches("15.8") {
+			t.Fatal("wrong amount match")
+		}
+	})
+	// An empty search hides nothing.
+	t.Run("empty search matches all", func(t *testing.T) {
+		if !tx.Matches(" ") {
+			t.Fatal("empty search hid a transaction")
+		}
+	})
+}
+
 func TestPriceIndex(t *testing.T) {
 	ix := NewPriceIndex([]Price{
 		{Base: "USD", Quote: "ILS", Date: MustDate("2026-10-01"), Rate: dec("3.70"), Source: "central"},

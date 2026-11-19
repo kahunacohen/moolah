@@ -6,6 +6,7 @@
     {{range .Data.Choices}}<option value="{{.}}" {{if eq . $.Data.Account}}selected{{end}}>{{.}}</option>{{end}}
   </select></div>
   <div><label>{{.T "tags"}}</label><br><input name="tag" value="{{.Data.Tag}}" size="12"></div>
+  <div><label for="search">{{.T "search"}}</label><br><input id="search" name="search" type="search" value="{{.Data.Search}}" size="16"></div>
   <button class="secondary">{{.T "reports.show"}}</button>
 </form>
 {{if not .Data.Rows}}<p class="muted">{{.T "no_transactions"}}</p>{{else}}

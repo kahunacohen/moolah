@@ -51,6 +51,30 @@ type Transaction struct {
 	Version    int64 // increases on every change; used to detect edits from two places
 }
 
+// Matches reports whether a search text finds t: the payee or note contains it,
+// ignoring case, or, when the text is a number, a line has that amount with
+// either sign.
+func (t Transaction) Matches(search string) bool {
+	search = strings.TrimSpace(search)
+	if search == "" {
+		return true
+	}
+	lower := strings.ToLower(search)
+	if strings.Contains(strings.ToLower(t.Payee), lower) || strings.Contains(strings.ToLower(t.Note), lower) {
+		return true
+	}
+	n, err := ParseDecimal(search)
+	if err != nil {
+		return false
+	}
+	for _, p := range t.Postings {
+		if p.Amount.Value.Abs().Equal(n.Abs()) {
+			return true
+		}
+	}
+	return false
+}
+
 // ValidateTag checks a tag name.
 func ValidateTag(tag string) error {
 	if tag == "" || strings.ContainsAny(tag, " \t\n,#") {
